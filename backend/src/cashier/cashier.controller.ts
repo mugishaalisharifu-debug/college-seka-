@@ -23,7 +23,7 @@ export class InventoryController {
   constructor(private readonly inventoryService: InventoryService) {}
 
   @Get('items')
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster')
   async getItems() {
     return await this.inventoryService.getAllItems();
   }

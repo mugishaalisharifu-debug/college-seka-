@@ -229,29 +229,6 @@ export default function BursarDashboardPage() {
     (selectedStudent?.arrears || 0);
   const netOutstanding = Math.max(0, totalCharged - totalPaidHistorical);
 
-  // Filters & selection
-  const [levelFilter, setLevelFilter] = useState<EducationLevelFilter>("All");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedStudentId, setSelectedStudentId] = useState<string>("");
-
-  const selectedStudent = students.find((s) => s.id === selectedStudentId) || students[0];
-
-  // Calculated ledger metrics for selected student
-  const currentTermFee = useMemo(() => {
-    if (!selectedStudent?.applicableFees) return 0;
-    return selectedStudent.applicableFees.reduce((sum, item) => sum + item.amount, 0);
-  }, [selectedStudent]);
-
-  const totalPaidHistorical = useMemo(() => {
-    if (!selectedStudent) return 0;
-    return payments
-      .filter((p) => p.studentId === selectedStudent.id)
-      .reduce((sum, p) => sum + p.amountPaid, 0);
-  }, [payments, selectedStudent]);
-
-  const totalCharged = (selectedStudent?.applicableFees?.reduce((sum, item) => sum + item.amount, 0) || 0) + (selectedStudent?.arrears || 0);
-  const netOutstanding = Math.max(0, totalCharged - totalPaidHistorical);
-
   // Overall statistics
   const totalCollected = payments.reduce((sum, p) => sum + p.amountPaid, 0);
 
@@ -741,6 +718,7 @@ export default function BursarDashboardPage() {
         )}
 
          </div>
+        </div>
         </>
       )}
     </div>
