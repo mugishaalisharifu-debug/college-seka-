@@ -542,26 +542,47 @@ export default function AdministratorDownloadsPage() {
               {previewItem.description}
             </div>
 
-            {previewItem.downloadUrl.startsWith("blob:") ||
-            previewItem.downloadUrl.endsWith(".pdf") ? (
-              <div className="rounded-2xl overflow-hidden border border-amber-900/10 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800/50 h-[380px]">
-                <iframe
-                  src={previewItem.downloadUrl}
-                  title={`Preview of ${previewItem.title}`}
-                  className="w-full h-full"
-                />
-              </div>
-            ) : (
-              <div className="rounded-2xl border border-dashed border-amber-900/10 dark:border-zinc-700 p-8 text-center bg-zinc-50 dark:bg-zinc-800/40">
-                <FileText className="w-10 h-10 text-zinc-400 mx-auto mb-3" />
-                <p className="text-xs font-bold text-zinc-700 dark:text-zinc-300">
-                  Preview not available for this format
-                </p>
-                <p className="text-[11px] text-zinc-500 mt-1">
-                  You can still download the document to open it locally.
-                </p>
-              </div>
-            )}
+            {(() => {
+              const url = previewItem.downloadUrl;
+              const format = previewItem.fileFormat || "";
+              const ext = format.toLowerCase() || url.split('.').pop()?.split('?')[0].toLowerCase() || '';
+              const isImage = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'svg'].includes(ext) || Boolean(url.match(/\.(png|jpg|jpeg|webp|gif|svg)/i));
+              const isPdf = ext === 'pdf' || url.toLowerCase().includes('.pdf');
+              const isOffice = ['xlsx', 'xls', 'docx', 'doc', 'pptx', 'ppt', 'csv'].includes(ext) || Boolean(url.match(/\.(xlsx|xls|docx|doc|pptx|ppt|csv)/i));
+
+              if (isImage) {
+                return (
+                  <div className="flex items-center justify-center p-4 h-[420px] bg-zinc-950/80 rounded-2xl overflow-hidden">
+                    <img src={url} alt={previewItem.title} className="max-h-full max-w-full object-contain rounded-lg" />
+                  </div>
+                );
+              }
+
+              if (isPdf) {
+                return (
+                  <div className="rounded-2xl overflow-hidden border border-amber-900/10 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800/50 h-[450px]">
+                    <iframe src={url} title={`Preview of ${previewItem.title}`} className="w-full h-full" />
+                  </div>
+                );
+              }
+
+              if (isOffice && !url.startsWith("blob:")) {
+                const officeViewerUrl = `https://view.officeapps.live.com/op/embed.aspx?src=${encodeURIComponent(url)}`;
+                return (
+                  <div className="rounded-2xl overflow-hidden border border-amber-900/10 dark:border-zinc-800 bg-zinc-100 dark:bg-zinc-800/50 h-[450px]">
+                    <iframe src={officeViewerUrl} title={`Preview of ${previewItem.title}`} className="w-full h-full" />
+                  </div>
+                );
+              }
+
+              return (
+                <div className="rounded-2xl border border-dashed border-amber-900/10 dark:border-zinc-700 p-8 text-center bg-zinc-50 dark:bg-zinc-800/40">
+                  <FileText className="w-12 h-12 text-emerald-700 mx-auto mb-3" />
+                  <p className="text-xs font-bold text-zinc-900 dark:text-white">Document File Ready ({previewItem.fileFormat})</p>
+                  <p className="text-[11px] text-zinc-500 mt-1">Click Download below to open or save the file on your device.</p>
+                </div>
+              );
+            })()}
 
             <div className="flex items-center justify-end gap-3 pt-3 border-t border-amber-900/10 dark:border-zinc-800">
               <button

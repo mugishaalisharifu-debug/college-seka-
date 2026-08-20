@@ -13,6 +13,7 @@ import {
   Loader2,
 } from "lucide-react";
 import ReportViewerModal, { ReportData } from "@/components/dashboard/ReportViewerModal";
+import { StatSkeleton, CardSkeleton } from "@/components/ui/Skeleton";
 import api from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-helpers";
 
@@ -67,8 +68,17 @@ export default function DosTvetDashboard() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <Loader2 className="w-8 h-8 animate-spin text-amber-700" />
+      <div className="space-y-6 pb-12 animate-pulse">
+        <div className="h-32 bg-zinc-200 dark:bg-zinc-800 rounded-3xl" />
+        <StatSkeleton count={4} />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2">
+            <CardSkeleton count={2} />
+          </div>
+          <div>
+            <CardSkeleton count={1} />
+          </div>
+        </div>
       </div>
     );
   }

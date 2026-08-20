@@ -17,7 +17,7 @@ import { RoleGuard } from 'common/guards/role.guard';
 import { Roles } from 'common/decorators/role.decorator';
 
 @UseGuards(JwtGuard, RoleGuard)
-@Roles('Store-Manager')
+@Roles('Store-Manager', 'School-receptionist', 'Admin')
 @Controller('store-manager')
 export class StoreManagerController {
   constructor(private readonly storeManagerService: StoreManagerService) {}
@@ -34,10 +34,11 @@ export class StoreManagerController {
     dto: {
       id?: string;
       itemName: string;
-      category: 'Boarding / Tools' | 'Academic Supplies' | 'Personal Care / Fees';
+      category:
+        'Boarding / Tools' | 'Academic Supplies' | 'Personal Care / Fees';
       quantity: number;
       unit?: string;
-    }
+    },
   ) {
     return await this.storeManagerService.createOrUpdateStockItem(dto);
   }
@@ -62,7 +63,7 @@ export class StoreManagerController {
       department: string;
       notes?: string;
     },
-    @Req() req: any
+    @Req() req: any,
   ) {
     const userId = req.user?.id;
     if (!userId) {

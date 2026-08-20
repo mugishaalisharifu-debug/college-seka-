@@ -9,9 +9,11 @@ import {
   Boxes,
   Search,
   Calendar,
+  CalendarPlus,
 } from "lucide-react";
 import api from "@/lib/api";
 import { getApiErrorMessage } from "@/lib/api-helpers";
+import { loadAcademicYears, addNextAcademicYear } from "@/lib/academic-years";
 
 // ==========================================
 // TYPES (Aligned with Backend Drizzle Schema)
@@ -51,8 +53,7 @@ export interface MasterRequirementItem {
   createdAt?: string | null;
 }
 
-// Academic Year Options
-const ACADEMIC_YEARS = ["2025-2026", "2026-2027"];
+// Academic Year & Term Options — the year list grows as the school adds future years.
 const ACADEMIC_TERMS: AcademicTerm[] = ["Term 1", "Term 2", "Term 3"];
 
 interface MasterRow {
@@ -83,9 +84,17 @@ export default function RequirementsSetupTab() {
   const [category, setCategory] = useState<RequirementCategory>("Boarding / Tools");
   const [scope, setScope] = useState<SectionScope>("All");
   const [selectedClassId, setSelectedClassId] = useState<string>("NONE");
-  const [academicYear, setAcademicYear] = useState<string>("2025-2026");
+  const [academicYear, setAcademicYear] = useState<string>("2026-2027");
+  const [availableYears, setAvailableYears] = useState<string[]>(() => loadAcademicYears());
   const [selectedTerms, setSelectedTerms] = useState<AcademicTerm[]>(["Term 1"]);
   const [description, setDescription] = useState("");
+
+  // Add the NEXT academic year so the system keeps working year after year.
+  const handleAddAcademicYear = () => {
+    const nextList = addNextAcademicYear(availableYears, academicYear);
+    setAvailableYears(nextList);
+    setAcademicYear(nextList[nextList.length - 1]); // auto-select the new year
+  };
 
   // Load classes and master items from the backend
   const loadData = async () => {
@@ -277,17 +286,26 @@ export default function RequirementsSetupTab() {
               <label className="font-bold text-zinc-700 dark:text-zinc-300 flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-emerald-600" /> Academic Year <span className="text-rose-500">*</span>
               </label>
-              <select
-                value={academicYear}
-                onChange={(e) => setAcademicYear(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-white cursor-pointer"
-              >
-                {ACADEMIC_YEARS.map((yr) => (
-                  <option key={yr} value={yr}>
-                    {yr}
-                  </option>
-                ))}
-              </select>
+              <div className="flex items-center gap-1">
+                <select
+                  value={academicYear}
+                  onChange={(e) => setAcademicYear(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-bold text-zinc-900 dark:text-white cursor-pointer"
+                >
+                  {availableYears.map((yr) => (
+                    <option key={yr} value={yr}>
+                      {yr}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleAddAcademicYear}
+                  title={`Add the next academic year for the following school year`}
+                  className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all cursor-pointer shrink-0"
+                >
+                  <CalendarPlus className="w-4 h-4" />
+                </button>
+              </div>
             </div>
 
             {/* Applicable Terms (Checkboxes) */}
@@ -386,7 +404,7 @@ export default function RequirementsSetupTab() {
               </label>
               <textarea
                 rows={2}
-                placeholder="e.g. Core i5 laptop with min 16GB RAM for Software Development students..."
+                placeholder="e.g. Scientific Calculator for Accounting students..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="w-full px-3.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs text-zinc-900 dark:text-white"
@@ -438,7 +456,7 @@ export default function RequirementsSetupTab() {
               className="px-2.5 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 cursor-pointer"
             >
               <option value="ALL">Year: All</option>
-              {ACADEMIC_YEARS.map((yr) => (
+              {availableYears.map((yr) => (
                 <option key={yr} value={yr}>
                   {yr}
                 </option>

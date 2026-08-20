@@ -1,14 +1,14 @@
-import { Injectable, Inject } from "@nestjs/common";
-import { DRIZZLE } from "src/db/db.provider";
-import { NodePgDatabase } from "drizzle-orm/node-postgres";
-import { eq, and, gte, lte, sql, desc, inArray } from "drizzle-orm";
-import * as schema from "../db/schema"; 
+import { Injectable, Inject } from '@nestjs/common';
+import { DRIZZLE } from 'src/db/db.provider';
+import { NodePgDatabase } from 'drizzle-orm/node-postgres';
+import { eq, and, gte, lte, sql, desc, inArray } from 'drizzle-orm';
+import * as schema from '../db/schema';
 
 @Injectable()
 export class ReportsService {
   constructor(
     @Inject(DRIZZLE)
-    private readonly db: NodePgDatabase<typeof schema>
+    private readonly db: NodePgDatabase<typeof schema>,
   ) {}
 
   // =========================================================================
@@ -22,12 +22,14 @@ export class ReportsService {
   async getCashierStockReport(
     startDate?: string,
     endDate?: string,
-    typeFilter?: "ALL" | "STOCK_IN" | "STOCK_OUT" | "SPOILAGE"
+    typeFilter?: 'ALL' | 'STOCK_IN' | 'STOCK_OUT' | 'SPOILAGE',
   ) {
     const conditions: any = [];
 
     if (startDate) {
-      conditions.push(gte(schema.inventoryTransactions.createdAt, new Date(startDate)));
+      conditions.push(
+        gte(schema.inventoryTransactions.createdAt, new Date(startDate)),
+      );
     }
     if (endDate) {
       // Set to end of day
@@ -35,7 +37,7 @@ export class ReportsService {
       end.setHours(23, 59, 59, 999);
       conditions.push(lte(schema.inventoryTransactions.createdAt, end));
     }
-    if (typeFilter && typeFilter !== "ALL") {
+    if (typeFilter && typeFilter !== 'ALL') {
       conditions.push(eq(schema.inventoryTransactions.type, typeFilter));
     }
 
@@ -60,32 +62,39 @@ export class ReportsService {
       .from(schema.inventoryTransactions)
       .innerJoin(
         schema.inventoryItems,
-        eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id)
+        eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id),
       )
       .innerJoin(
         schema.users,
-        eq(schema.inventoryTransactions.recordedBy, schema.users.id)
+        eq(schema.inventoryTransactions.recordedBy, schema.users.id),
       )
       .where(whereClause)
       .orderBy(desc(schema.inventoryTransactions.createdAt));
 
     // Map logs to format details string
     const logs = rawLogs.map((log) => {
-      let details = "";
-      if (log.type === "STOCK_IN") {
+      let details = '';
+      if (log.type === 'STOCK_IN') {
         details = log.supplier
-          ? `${log.supplier}${log.invoiceNumber ? ` (INV: ${log.invoiceNumber})` : ""}`
-          : "Delivery / Receipt";
-      } else if (log.type === "STOCK_OUT") {
-        details = log.issuedTo ? `Issued to ${log.issuedTo}` : "Kitchen / Kitchen usage";
-      } else if (log.type === "SPOILAGE") {
-        details = log.spoilageReason || log.notes || "Spoilage recorded";
+          ? `${log.supplier}${log.invoiceNumber ? ` (INV: ${log.invoiceNumber})` : ''}`
+          : 'Delivery / Receipt';
+      } else if (log.type === 'STOCK_OUT') {
+        details = log.issuedTo
+          ? `Issued to ${log.issuedTo}`
+          : 'Kitchen / Kitchen usage';
+      } else if (log.type === 'SPOILAGE') {
+        details = log.spoilageReason || log.notes || 'Spoilage recorded';
       }
 
       return {
         id: log.id,
-        date: log.date.toISOString().split("T")[0],
-        type: log.type === "STOCK_IN" ? "IN" : log.type === "STOCK_OUT" ? "OUT" : "SPOILAGE",
+        date: log.date.toISOString().split('T')[0],
+        type:
+          log.type === 'STOCK_IN'
+            ? 'IN'
+            : log.type === 'STOCK_OUT'
+              ? 'OUT'
+              : 'SPOILAGE',
         itemName: log.itemName,
         category: log.category,
         quantity: Number(log.quantity),
@@ -97,21 +106,21 @@ export class ReportsService {
 
     // Calculate KPI summaries
     const totalInKg = logs
-      .filter((l) => l.type === "IN")
+      .filter((l) => l.type === 'IN')
       .reduce((sum, item) => sum + item.quantity, 0);
 
     const totalOutKg = logs
-      .filter((l) => l.type === "OUT")
+      .filter((l) => l.type === 'OUT')
       .reduce((sum, item) => sum + item.quantity, 0);
 
     const totalSpoilageKg = logs
-      .filter((l) => l.type === "SPOILAGE")
+      .filter((l) => l.type === 'SPOILAGE')
       .reduce((sum, item) => sum + item.quantity, 0);
 
     return {
       period: {
-        startDate: startDate || "Beginning of Records",
-        endDate: endDate || "Today",
+        startDate: startDate || 'Beginning of Records',
+        endDate: endDate || 'Today',
       },
       summary: {
         totalInKg,
@@ -153,7 +162,7 @@ export class ReportsService {
         count: sql<number>`count(${schema.students.id})::int`,
       })
       .from(schema.students)
-      .where(eq(schema.students.status, "ACTIVE"))
+      .where(eq(schema.students.status, 'ACTIVE'))
       .groupBy(schema.students.educationLevel);
 
     // 3. Sum Payments collected per level for the given academic period
@@ -165,7 +174,7 @@ export class ReportsService {
       .from(schema.payments)
       .innerJoin(
         schema.students,
-        eq(schema.payments.studentId, schema.students.id)
+        eq(schema.payments.studentId, schema.students.id),
       )
       .where(eq(schema.payments.academicPeriod, academicPeriod))
       .groupBy(schema.students.educationLevel);
@@ -174,9 +183,10 @@ export class ReportsService {
     paymentsPerScope.forEach((p) => paidMap.set(p.scope, p.totalPaid));
 
     // 4. Construct Fee Collection Summary Rows
-    const scopesToProcess = scopeFilter && scopeFilter !== "All"
-      ? [scopeFilter]
-      : ["PRIMARY", "LOWER SECONDARY", "TVET", "NURSERY"];
+    const scopesToProcess =
+      scopeFilter && scopeFilter !== 'All'
+        ? [scopeFilter]
+        : ['PRIMARY', 'LOWER SECONDARY', 'TVET', 'NURSERY'];
 
     const summary = scopesToProcess.map((scope) => {
       const count = studentCounts.find((sc) => sc.scope === scope)?.count || 0;
@@ -191,13 +201,14 @@ export class ReportsService {
         totalCharged,
         totalPaid,
         outstanding,
-        collectionRate: totalCharged > 0 ? Math.round((totalPaid / totalCharged) * 100) : 0,
+        collectionRate:
+          totalCharged > 0 ? Math.round((totalPaid / totalCharged) * 100) : 0,
       };
     });
 
     // 5. Fetch Ledger Transactions
     const txConditions = [eq(schema.payments.academicPeriod, academicPeriod)];
-    if (scopeFilter && scopeFilter !== "All") {
+    if (scopeFilter && scopeFilter !== 'All') {
       txConditions.push(eq(schema.students.educationLevel, scopeFilter as any));
     }
 
@@ -213,7 +224,10 @@ export class ReportsService {
         remarks: schema.payments.remarks,
       })
       .from(schema.payments)
-      .innerJoin(schema.students, eq(schema.payments.studentId, schema.students.id))
+      .innerJoin(
+        schema.students,
+        eq(schema.payments.studentId, schema.students.id),
+      )
       .where(and(...txConditions))
       .orderBy(desc(schema.payments.createdAt));
 
@@ -223,8 +237,8 @@ export class ReportsService {
       studentName: tx.studentName,
       category: tx.category,
       amount: Number(tx.amount),
-      method: tx.remarks || "Bank Transfer / Cash",
-      date: tx.date.toISOString().split("T")[0],
+      method: tx.remarks || 'Bank Transfer / Cash',
+      date: tx.date.toISOString().split('T')[0],
       period: tx.period,
     }));
 
@@ -272,14 +286,14 @@ export class ReportsService {
           .where(
             and(
               eq(schema.storeTransactions.storeItemId, item.id),
-              eq(schema.storeTransactions.type, "ISSUED_OUT")
-            )
+              eq(schema.storeTransactions.type, 'ISSUED_OUT'),
+            ),
           );
 
         const totalReceived = dep[0]?.total || 0;
         const totalIssued = iss[0]?.total || 0;
         const balance = Number(item.availableQuantity);
-        const status = balance < 10 ? "Low Stock Alert" : "In Stock";
+        const status = balance < 10 ? 'Low Stock Alert' : 'In Stock';
 
         return [
           item.name,
@@ -288,22 +302,28 @@ export class ReportsService {
           `${balance} ${item.unit}`,
           status,
         ];
-      })
+      }),
     );
 
     return {
-      id: "RPT-001",
-      title: "Consolidated Store Usage & Balance Report",
-      academicYear: "2026/2027",
-      generatedDate: new Date().toLocaleDateString("en-US", {
-        month: "long",
-        day: "2-digit",
-        year: "numeric",
+      id: 'RPT-001',
+      title: 'Consolidated Store Usage & Balance Report',
+      academicYear: '2026/2027',
+      generatedDate: new Date().toLocaleDateString('en-US', {
+        month: 'long',
+        day: '2-digit',
+        year: 'numeric',
       }),
-      generatedBy: "Store Manager Office",
+      generatedBy: 'Store Manager Office',
       summary:
-        "Full summary of items collected from incoming students and issued out to school departments. Tracks current stock balances to ensure zero waste.",
-      headers: ["Item Description", "Total Received", "Stock Issued", "Current Balance", "Status"],
+        'Full summary of items collected from incoming students and issued out to school departments. Tracks current stock balances to ensure zero waste.',
+      headers: [
+        'Item Description',
+        'Total Received',
+        'Stock Issued',
+        'Current Balance',
+        'Status',
+      ],
       rows,
     };
   }
@@ -312,7 +332,7 @@ export class ReportsService {
    * Audit of Student Requirement Collections.
    */
   async getStudentRequirementAuditReport(academicYear: string) {
-    const levels = ["NURSERY", "PRIMARY", "LOWER SECONDARY", "TVET"] as const;
+    const levels = ['NURSERY', 'PRIMARY', 'LOWER SECONDARY', 'TVET'] as const;
 
     const rows = await Promise.all(
       levels.map(async (level) => {
@@ -323,8 +343,8 @@ export class ReportsService {
           .where(
             and(
               eq(schema.students.educationLevel, level),
-              eq(schema.students.status, "ACTIVE")
-            )
+              eq(schema.students.status, 'ACTIVE'),
+            ),
           );
         const studentCount = countRes[0]?.count || 0;
 
@@ -336,7 +356,7 @@ export class ReportsService {
           .from(schema.studentRequirementChecks)
           .innerJoin(
             schema.students,
-            eq(schema.studentRequirementChecks.studentId, schema.students.id)
+            eq(schema.studentRequirementChecks.studentId, schema.students.id),
           )
           .where(eq(schema.students.educationLevel, level));
 
@@ -344,37 +364,45 @@ export class ReportsService {
         const totalMissing = checks.filter((c) => !c.isBrought).length;
         const totalChecks = checks.length;
         const fulfillmentRate =
-          totalChecks > 0 ? ((totalBrought / totalChecks) * 100).toFixed(1) + "%" : "100%";
+          totalChecks > 0
+            ? ((totalBrought / totalChecks) * 100).toFixed(1) + '%'
+            : '100%';
 
         return [
-          level === "NURSERY"
-            ? "KG / Nursery"
-            : level === "PRIMARY"
-            ? "Primary (P1-P6)"
-            : level === "LOWER SECONDARY"
-            ? "Lower Secondary (S1-S3)"
-            : "TVET Trades (L3-L5)",
+          level === 'NURSERY'
+            ? 'KG / Nursery'
+            : level === 'PRIMARY'
+              ? 'Primary (P1-P6)'
+              : level === 'LOWER SECONDARY'
+                ? 'Lower Secondary (S1-S3)'
+                : 'TVET Trades (L3-L5)',
           `${studentCount} Students`,
           `${totalBrought} Items Submitted`,
           `${totalMissing} Items Missing`,
           fulfillmentRate,
         ];
-      })
+      }),
     );
 
     return {
-      id: "RPT-002",
-      title: "Student Requirement Collection Audit",
+      id: 'RPT-002',
+      title: 'Student Requirement Collection Audit',
       academicYear,
-      generatedDate: new Date().toLocaleDateString("en-US", {
-        month: "long",
-        day: "2-digit",
-        year: "numeric",
+      generatedDate: new Date().toLocaleDateString('en-US', {
+        month: 'long',
+        day: '2-digit',
+        year: 'numeric',
       }),
-      generatedBy: "Store Manager Office",
+      generatedBy: 'Store Manager Office',
       summary:
-        "Audit of items brought by newly admitted students across KG, Primary, Secondary, and TVET levels.",
-      headers: ["Education Level", "Students Enrolled", "Items Brought", "Missing Items", "Fulfillment Rate"],
+        'Audit of items brought by newly admitted students across KG, Primary, Secondary, and TVET levels.',
+      headers: [
+        'Education Level',
+        'Students Enrolled',
+        'Items Brought',
+        'Missing Items',
+        'Fulfillment Rate',
+      ],
       rows,
     };
   }
@@ -387,9 +415,9 @@ export class ReportsService {
    * Primary/Nursery or Secondary Operational Summary Report.
    */
   async getOperationalReport(
-    scope: "PRIMARY" | "NURSERY" | "LOWER SECONDARY" | "TVET",
+    scope: 'PRIMARY' | 'NURSERY' | 'LOWER SECONDARY' | 'TVET',
     academicYear: string,
-    term: string
+    term: string,
   ) {
     const studentCountRes = await this.db
       .select({ count: sql<number>`count(${schema.students.id})::int` })
@@ -397,8 +425,8 @@ export class ReportsService {
       .where(
         and(
           eq(schema.students.educationLevel, scope),
-          eq(schema.students.status, "ACTIVE")
-        )
+          eq(schema.students.status, 'ACTIVE'),
+        ),
       );
 
     const applicationsRes = await this.db
@@ -417,7 +445,7 @@ export class ReportsService {
       activeStudents: studentCountRes[0]?.count || 0,
       applicationsSummary: applicationsRes.reduce(
         (acc, curr) => ({ ...acc, [curr.status]: curr.count }),
-        { PENDING: 0, APPROVED: 0, REJECTED: 0 }
+        { PENDING: 0, APPROVED: 0, REJECTED: 0 },
       ),
     };
   }

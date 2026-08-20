@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   UserPlus,
   ArrowLeft,
@@ -9,35 +9,45 @@ import {
   Phone,
   CheckCircle2,
   Save,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { AcademicScope, EducationCategory, getScopeConfig } from "@/lib/role-scope";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 
-interface ClassOption {
+// Backend class rows (as returned by GET /dos/classes) — live from the database.
+interface BackendClass {
   id: string;
-  category: EducationCategory;
-  levelName: string;
-  streamName: string;
+  className: string;
+  scope: string;
+  tradeName?: string | null;
 }
 
-/** Active class seats of a scope: every managed level combined with its streams or trades. */
-function buildClassOptions(scope: AcademicScope): ClassOption[] {
-  const config = getScopeConfig(scope);
-  return config.categories.flatMap((category) =>
-    config.classes.flatMap((levelName) =>
-      config.streams.map((streamName) => ({
-        id: `CLS-${levelName}-${streamName}`.replace(/[^a-zA-Z0-9]+/g, "-").toUpperCase(),
-        category,
-        levelName,
-        streamName,
-      }))
-    )
-  );
+function uiCategoryToScope(category: EducationCategory): string {
+  switch (category) {
+    case "Nursery":
+      return "NURSERY";
+    case "Primary":
+      return "PRIMARY";
+    case "Lower Secondary":
+      return "LOWER SECONDARY";
+    case "TVET":
+      return "TVET";
+    default:
+      return "PRIMARY";
+  }
 }
 
 export default function StudentAddForm({ scope }: { scope: AcademicScope }) {
   const config = getScopeConfig(scope);
-  const availableClasses = buildClassOptions(scope);
+
+  // Live class options from the database.
+  const [availableClasses, setAvailableClasses] = useState<BackendClass[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   // Student Information State
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
@@ -58,15 +68,58 @@ export default function StudentAddForm({ scope }: { scope: AcademicScope }) {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
 
-  // Filter available classes based on chosen Category
-  const filteredClasses = availableClasses.filter((c) => c.category === category);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const res = await api.get<BackendClass[]>("/dos/classes");
+        if (!cancelled) setAvailableClasses(res.data || []);
+      } catch (error) {
+        if (!cancelled) setLoadError(getApiErrorMessage(error, "Could not load classes."));
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [scope]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  // Filter available classes based on chosen Category
+  const filteredClasses = availableClasses.filter(
+    (c) => c.scope === uiCategoryToScope(category),
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    // Simulate API registration delay
-    setTimeout(() => {
+    if (!firstName.trim() || !lastName.trim() || !guardianName.trim() || !guardianPhone.trim()) {
+      setLoadError("First name, last name, guardian name and phone are required.");
+      setIsSubmitting(false);
+      return;
+    }
+
+    const payload = {
+      studentName: `${firstName.trim()} ${lastName.trim()}`.trim(),
+      gender,
+      dateOfBirth: dob ? new Date(dob).toISOString() : new Date().toISOString(),
+      educationLevel: uiCategoryToScope(category),
+      tradeName:
+        category === "TVET"
+          ? (filteredClasses.find((c) => c.id === selectedClassId)?.className ?? null)
+          : null,
+      classId: selectedClassId || null,
+      parentName: guardianName.trim(),
+      parentPhone: guardianPhone.trim(),
+      studentType:
+        category === "Lower Secondary" || category === "TVET" ? "BOARDING" : "DAY",
+      status: "ACTIVE",
+    };
+
+    try {
+      await api.post("/dos/students", payload);
       setIsSubmitting(false);
       setSuccessMessage(true);
 
@@ -78,7 +131,10 @@ export default function StudentAddForm({ scope }: { scope: AcademicScope }) {
       setSelectedClassId("");
       setGuardianName("");
       setGuardianPhone("");
-    }, 1000);
+    } catch (err) {
+      setIsSubmitting(false);
+      setLoadError(getApiErrorMessage(err, "Failed to register the student."));
+    }
   };
 
   return (
@@ -115,6 +171,20 @@ export default function StudentAddForm({ scope }: { scope: AcademicScope }) {
           >
             Dismiss
           </button>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 flex items-start gap-2 text-rose-800 dark:text-rose-300 text-xs font-semibold">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <span>{loadError}</span>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="p-6 rounded-3xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-center gap-3 text-xs font-bold text-zinc-500">
+          <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+          Loading available classes from the database...
         </div>
       )}
 
@@ -166,7 +236,7 @@ export default function StudentAddForm({ scope }: { scope: AcademicScope }) {
                 <option value="">-- Choose Class / Stream --</option>
                 {filteredClasses.map((cls) => (
                   <option key={cls.id} value={cls.id}>
-                    {`${cls.levelName} — ${cls.streamName}`}
+                    {cls.className}
                   </option>
                 ))}
               </select>

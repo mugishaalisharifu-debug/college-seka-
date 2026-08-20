@@ -3,17 +3,39 @@ import {
   Inject,
   ForbiddenException,
   NotFoundException,
+  BadRequestException,
 } from '@nestjs/common';
 import * as schema from '../db/schema';
 import { DRIZZLE } from '../db/db.provider';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { eq, inArray } from 'drizzle-orm';
 
+// Normalize a free-form gender value (e.g. 'male', 'MALE', ' Female ')
+// into one of the exact Postgres enum values: 'Male' | 'Female'.
+// Returns null when the value is missing or not a recognized gender.
+function normalizeGender(value: string | null | undefined): 'Male' | 'Female' | null {
+  if (!value) return null;
+  const lower = value.trim().toLowerCase();
+  if (lower === 'male') return 'Male';
+  if (lower === 'female') return 'Female';
+  return null;
+}
+
+// Same as normalizeGender, but throws a clear 400 when the gender is missing
+// or unrecognized. Used where the DB column is NOT NULL.
+function requireGender(value: string | null | undefined): 'Male' | 'Female' {
+  const normalized = normalizeGender(value);
+  if (!normalized) {
+    throw new BadRequestException(
+      `Invalid gender value: "${value ?? ''}". Expected "Male" or "Female".`,
+    );
+  }
+  return normalized;
+}
+
 @Injectable()
 export class DosService {
-  constructor(
-    @Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>,
-  ) {}
+  constructor(@Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>) {}
 
   //----------------- CLASSES -----------------//
 
@@ -126,9 +148,7 @@ export class DosService {
       );
     }
 
-    await this.db
-      .delete(schema.classes)
-      .where(eq(schema.classes.id, classId));
+    await this.db.delete(schema.classes).where(eq(schema.classes.id, classId));
 
     return {
       message: 'Class deleted successfully',
@@ -264,7 +284,7 @@ export class DosService {
       .values({
         regNumber,
         studentName,
-        gender: gender ? gender : null,
+        gender: requireGender(gender),
         dateOfBirth: new Date(dateOfBirth),
         educationLevel,
         tradeName: educationLevel === 'TVET' ? tradeName : null,
@@ -295,7 +315,9 @@ export class DosService {
       return await this.db
         .select()
         .from(schema.students)
-        .where(inArray(schema.students.educationLevel, ['LOWER SECONDARY', 'TVET']));
+        .where(
+          inArray(schema.students.educationLevel, ['LOWER SECONDARY', 'TVET']),
+        );
     }
 
     if (user.role === 'DOS-Secondary') {
@@ -410,6 +432,10 @@ export class DosService {
       status,
     } = updateDto;
 
+    // Map the incoming gender to the exact enum values the DB accepts
+    // ('Male' | 'Female'); the previous .toLowerCase() produced invalid input.
+    const normalizedGender = gender ? normalizeGender(gender) : null;
+
     const targetLevel = educationLevel || existingStudent.educationLevel;
     if (user.role === 'DOS-Secondary' && targetLevel !== 'LOWER SECONDARY') {
       throw new ForbiddenException(
@@ -433,7 +459,7 @@ export class DosService {
       .update(schema.students)
       .set({
         ...(studentName && { studentName }),
-        ...(gender && { gender: gender.toLowerCase() }),
+        ...(normalizedGender && { gender: normalizedGender }),
         ...(dateOfBirth && { dateOfBirth: new Date(dateOfBirth) }),
         ...(educationLevel && { educationLevel }),
         ...(tradeName !== undefined && {

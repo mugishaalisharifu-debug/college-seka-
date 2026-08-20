@@ -6,6 +6,6 @@ import { SupabaseModule } from 'src/supabase/supabase.module';
 @Module({
   imports: [DbModule, SupabaseModule],
   controllers: [ApplicationsController],
-  providers: [ApplicationsService]
+  providers: [ApplicationsService],
 })
 export class ApplicationsModule {}

@@ -29,9 +29,15 @@ export class FinanceController {
 
   @Post('fee-structures')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async createFeeStructure(@Body() body: any) {
-    if (!body.academicYear || !body.term || !body.scope || !body.name || !body.amount) {
+    if (
+      !body.academicYear ||
+      !body.term ||
+      !body.scope ||
+      !body.name ||
+      !body.amount
+    ) {
       throw new BadRequestException('Missing required fee structure fields.');
     }
     return await this.financeService.createFeeStructure(body);
@@ -39,7 +45,7 @@ export class FinanceController {
 
   @Post('fee-structures/bulk')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async saveBulkFees(@Body() body: { fees: any[] }) {
     if (!body.fees || !Array.isArray(body.fees) || body.fees.length === 0) {
       throw new BadRequestException('Fees array cannot be empty.');
@@ -48,11 +54,12 @@ export class FinanceController {
   }
 
   @Get('fee-structures')
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async getAllFeeStructures(
     @Query('academicYear') academicYear?: string,
     @Query('term') term?: 'TERM_1' | 'TERM_2' | 'TERM_3',
-    @Query('scope') scope?: 'PRIMARY' | 'LOWER SECONDARY' | 'TVET' | 'NURSERY' | 'All',
+    @Query('scope')
+    scope?: 'PRIMARY' | 'LOWER SECONDARY' | 'TVET' | 'NURSERY' | 'All',
   ) {
     return await this.financeService.getAllFeeStructures(
       academicYear,
@@ -62,23 +69,20 @@ export class FinanceController {
   }
 
   @Get('fee-structures/:id')
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async getFeeStructureById(@Param('id') id: string) {
     return await this.financeService.getFeeStructureById(id);
   }
 
   @Patch('fee-structures/:id')
-  @Roles('Bursar')
-  async updateFeeStructure(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
+  async updateFeeStructure(@Param('id') id: string, @Body() body: any) {
     return await this.financeService.updateFeeStructure(id, body);
   }
 
   @Delete('fee-structures/:id')
   @HttpCode(HttpStatus.OK)
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async deleteFeeStructure(@Param('id') id: string) {
     return await this.financeService.deleteFeeStructure(id);
   }
@@ -88,7 +92,7 @@ export class FinanceController {
   // ==========================================
 
   @Get('ledger/:studentId')
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async getStudentsLedger(
     @Param('studentId') studentId: string,
     @Query('academicYear') academicYear?: string,
@@ -111,7 +115,7 @@ export class FinanceController {
   }
 
   @Get('payments')
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async getAllPayments(
     @Query('studentId') studentId?: string,
     @Query('academicPeriod') academicPeriod?: string,
@@ -126,7 +130,7 @@ export class FinanceController {
 
   @Post('payments')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async recordPayment(
     @Body()
     paymentBody: {
@@ -149,23 +153,20 @@ export class FinanceController {
   }
 
   @Get('payments/:id')
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async getPaymentById(@Param('id') id: string) {
     return await this.financeService.getPaymentById(id);
   }
 
   @Patch('payments/:id')
-  @Roles('Bursar')
-  async updatePayment(
-    @Param('id') id: string,
-    @Body() body: any,
-  ) {
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
+  async updatePayment(@Param('id') id: string, @Body() body: any) {
     return await this.financeService.updatePayment(id, body);
   }
 
   @Delete('payments/:id')
   @HttpCode(HttpStatus.OK)
-  @Roles('Bursar')
+  @Roles('Bursar', 'Admin', 'Secondary-HeadMaster', 'Primary-HeadMaster')
   async deletePayment(@Param('id') id: string) {
     return await this.financeService.deletePayment(id);
   }

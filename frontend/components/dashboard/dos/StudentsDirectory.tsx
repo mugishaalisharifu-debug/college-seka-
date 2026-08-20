@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 import {
   Users,
   Search,
@@ -20,6 +23,7 @@ import {
 } from "lucide-react";
 import { downloadTextFile } from "@/lib/file-export";
 import ReportViewerModal, { ReportData } from "@/components/dashboard/ReportViewerModal";
+import { TableSkeleton } from "@/components/ui/Skeleton";
 import { AcademicScope, EducationCategory, getScopeConfig } from "@/lib/role-scope";
 
 type Category = EducationCategory;
@@ -35,6 +39,7 @@ interface Student {
   fullName: string;
   gender: "Male" | "Female";
   category: Category;
+  classId?: string;
   currentClass: string;
   currentStream?: string;
   academicYear: string;
@@ -58,12 +63,105 @@ function isS3SlipRequired(student: Student): boolean {
   return isTvetL3 || isSenior3;
 }
 
+// Backend `education_level` values → local UI category.
+function levelToCategory(level: string): Category {
+  switch (level) {
+    case "NURSERY":
+      return "Nursery";
+    case "PRIMARY":
+      return "Primary";
+    case "LOWER SECONDARY":
+      return "Lower Secondary";
+    case "TVET":
+      return "TVET";
+    default:
+      return "Primary";
+  }
+}
+
+// Local UI category → backend `educationLevel`.
+function categoryToLevel(category: Category): string {
+  switch (category) {
+    case "Nursery":
+      return "NURSERY";
+    case "Primary":
+      return "PRIMARY";
+    case "Lower Secondary":
+      return "LOWER SECONDARY";
+    case "TVET":
+      return "TVET";
+    default:
+      return "PRIMARY";
+  }
+}
+
+interface BackendStudent {
+  id: string;
+  studentName: string;
+  gender: "Male" | "Female" | null;
+  educationLevel: string;
+  tradeName?: string | null;
+  classId?: string | null;
+  parentName: string;
+  parentPhone: string;
+  studentType?: string;
+  status?: string;
+}
+
+// Convert backend student rows into the local UI shape.
+function mapStudents(rows: BackendStudent[], map: Record<string, string>): Student[] {
+  return (rows || []).map((s) => ({
+    id: s.id,
+    fullName: s.studentName,
+    gender: s.gender || "Male",
+    category: levelToCategory(s.educationLevel),
+    classId: s.classId || undefined,
+    currentClass: s.classId && map[s.classId] ? map[s.classId] : s.tradeName || "",
+    currentStream: s.tradeName || undefined,
+    academicYear: "2026",
+    guardianName: s.parentName,
+    guardianPhone: s.parentPhone,
+    guardianEmail: "",
+    hasS3ResultSlip: false,
+    requirementStatus: "Completed / Cleared",
+    documents: [],
+    status: (s.status === "SUSPENDED" ? "Suspended" : "Active") as Student["status"],
+  }));
+}
+
 export default function StudentsDirectory({ scope }: { scope: AcademicScope }) {
   const config = getScopeConfig(scope);
   const defaultClass = config.classes[0];
 
   const [students, setStudents] = useState<Student[]>([]);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+
+  const [backendClasses, setBackendClasses] = useState<{id: string, className: string, scope: string, tradeName?: string | null}[]>([]);
+  const [classMap, setClassMap] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    async function load() {
+      setIsLoading(true);
+      try {
+        const classesRes = await api.get<{ id: string; className: string, scope: string, tradeName?: string | null }>("/dos/classes");
+        const map: Record<string, string> = {};
+        (classesRes.data || []).forEach(
+          (c) => (map[c.id] = c.className),
+        );
+        setClassMap(map);
+        setBackendClasses(classesRes.data || []);
+
+        const studentsRes = await api.get<BackendStudent[]>("/dos/students");
+        setStudents(mapStudents(studentsRes.data, map));
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "Could not load students."));
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   // Filters
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
@@ -82,6 +180,7 @@ export default function StudentsDirectory({ scope }: { scope: AcademicScope }) {
   const [fullName, setFullName] = useState("");
   const [gender, setGender] = useState<"Male" | "Female">("Male");
   const [category, setCategory] = useState<Category>(config.categories[0]);
+  const [formSelectedClassId, setFormSelectedClassId] = useState<string>("");
   const [currentClass, setCurrentClass] = useState(defaultClass);
   const [currentStream, setCurrentStream] = useState(config.streams[0]);
   const [academicYear, setAcademicYear] = useState("2026");
@@ -98,6 +197,7 @@ export default function StudentsDirectory({ scope }: { scope: AcademicScope }) {
     setFullName("");
     setGender("Male");
     setCategory(config.categories[0]);
+    setFormSelectedClassId("");
     setCurrentClass(defaultClass);
     setCurrentStream(config.streams[0]);
     setAcademicYear("2026");
@@ -113,6 +213,7 @@ export default function StudentsDirectory({ scope }: { scope: AcademicScope }) {
     setFullName(stu.fullName);
     setGender(stu.gender);
     setCategory(stu.category);
+    setFormSelectedClassId(stu.classId || "");
     setCurrentClass(stu.currentClass);
     setCurrentStream(stu.currentStream || "");
     setAcademicYear(stu.academicYear);
@@ -124,107 +225,104 @@ export default function StudentsDirectory({ scope }: { scope: AcademicScope }) {
     setActiveMenuId(null);
   };
 
-  const handleSaveStudent = (e: React.FormEvent) => {
+  const handleSaveStudent = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!fullName || !guardianName || !guardianPhone) return;
-
-    // Requirement calculation to prevent national exam rejection
-    let reqStatus: Student["requirementStatus"] = "Completed / Cleared";
-    if (currentClass.includes("L3") && !hasS3ResultSlip) {
-      reqStatus = "Blocked / Incomplete for National Exam";
-    } else if (!hasS3ResultSlip) {
-      reqStatus = "Pending Documents";
+    if (!fullName || !guardianName || !guardianPhone) {
+      toast.error("Full name, guardian name and phone are required.");
+      return;
     }
 
-    if (editingStudent) {
-      setStudents((prev) =>
-        prev.map((s) =>
-          s.id === editingStudent.id
-            ? {
-                ...s,
-                fullName,
-                gender,
-                category,
-                currentClass,
-                currentStream,
-                academicYear,
-                guardianName,
-                guardianPhone,
-                guardianEmail,
-                hasS3ResultSlip,
-                requirementStatus: reqStatus,
-              }
-            : s
-        )
+    // Resolve the selected class name into a backend classId (if it exists).
+    const classId = formSelectedClassId || null;
+    const selectedClass = backendClasses.find(c => c.id === classId);
+    const resolvedTradeName = selectedClass?.tradeName || null;
+
+    const payload = {
+      studentName: fullName.trim(),
+      gender,
+      dateOfBirth: new Date().toISOString(),
+      educationLevel: categoryToLevel(category),
+      tradeName: category === "TVET" ? resolvedTradeName : null,
+      classId,
+      parentName: guardianName.trim(),
+      parentPhone: guardianPhone.trim(),
+      studentType: (category === "Lower Secondary" || category === "TVET") ? "BOARDING" : "DAY",
+      status: "ACTIVE",
+    };
+
+    try {
+      if (editingStudent) {
+        await api.patch(`/dos/students/${editingStudent.id}`, payload);
+        toast.success("Student updated successfully.");
+      } else {
+        await api.post("/dos/students", payload);
+        toast.success("Student registered successfully.");
+      }
+      setIsAddEditModalOpen(false);
+
+      // Reload the directory from the backend.
+      const studentsRes = await api.get<BackendStudent[]>("/dos/students");
+      setStudents(mapStudents(studentsRes.data, classMap));
+    } catch (error) {
+      toast.error(
+        getApiErrorMessage(error, editingStudent
+          ? "Failed to update the student."
+          : "Failed to register the student."),
       );
-    } else {
-      const newStudent: Student = {
-        id: `STU-2026-${Date.now().toString().slice(-3)}`,
-        fullName,
-        gender,
-        category,
-        currentClass,
-        currentStream,
-        academicYear,
-        guardianName,
-        guardianPhone,
-        guardianEmail,
-        hasS3ResultSlip,
-        requirementStatus: reqStatus,
-        documents: hasS3ResultSlip
-          ? [{ name: "S3_National_Exam_Result_Slip.pdf", type: "Result Slip", date: "Aug 11, 2026" }]
-          : [],
-        status: "Active",
-      };
-      setStudents([newStudent, ...students]);
     }
-    setIsAddEditModalOpen(false);
   };
 
-  const handleDeleteStudent = (id: string, name: string) => {
+  const handleDeleteStudent = async (id: string, name: string) => {
     setActiveMenuId(null);
-    if (confirm(`Are you sure you want to delete ${name} (${id}) from the system?`)) {
-      setStudents((prev) => prev.filter((s) => s.id !== id));
+    if (!confirm(`Are you sure you want to delete ${name} (${id}) from the system?`)) return;
+    try {
+      await api.delete(`/dos/students/${id}`);
+      const studentsRes = await api.get<BackendStudent[]>("/dos/students");
+      setStudents(mapStudents(studentsRes.data, classMap));
+      toast.success("Student deleted successfully.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to delete the student."));
     }
   };
 
-  const handleBatchImport = () => {
+  const handleBatchImport = async () => {
     if (!rawUploadText.trim()) return;
     try {
       const lines = rawUploadText.trim().split("\n");
-      const newImported: Student[] = lines.map((line, index) => {
+      const educationLevel = categoryToLevel(config.categories[0]);
+
+      let imported = 0;
+      for (const [index, line] of lines.entries()) {
         const parts = line.split(",");
         const name = parts[0]?.trim() || `Imported Student ${index + 1}`;
         const cls = parts[1]?.trim() || defaultClass;
         const parent = parts[2]?.trim() || "Guardian Name";
         const phone = parts[3]?.trim() || "+250 788 000 000";
 
-        const needsResultSlip = cls.includes("L3");
+        const classId = Object.keys(classMap).find((key) => classMap[key] === cls) || null;
 
-        return {
-          id: `STU-IMP-${Date.now().toString().slice(-3)}${index}`,
-          fullName: name,
+        await api.post("/dos/students", {
+          studentName: name,
           gender: index % 2 === 0 ? "Male" : "Female",
-          category: config.categories[0],
-          currentClass: cls,
-          currentStream: `${cls} - ${config.streams[0]}`,
-          academicYear: "2026",
-          guardianName: parent,
-          guardianPhone: phone,
-          guardianEmail: `${name.toLowerCase().replace(/\s+/g, ".")}@gmail.com`,
-          hasS3ResultSlip: !needsResultSlip,
-          requirementStatus: needsResultSlip ? "Blocked / Incomplete for National Exam" : "Completed / Cleared",
-          documents: [],
-          status: "Active",
-        };
-      });
+          dateOfBirth: new Date().toISOString(),
+          educationLevel,
+          tradeName: config.categories[0] === "TVET" ? config.streams[0] : null,
+          classId,
+          parentName: parent,
+          parentPhone: phone,
+          studentType: (config.categories[0] === "Lower Secondary" || config.categories[0] === "TVET") ? "BOARDING" : "DAY",
+          status: "ACTIVE",
+        });
+        imported += 1;
+      }
 
-      setStudents([...newImported, ...students]);
+      const studentsRes = await api.get<BackendStudent[]>("/dos/students");
+      setStudents(mapStudents(studentsRes.data, classMap));
       setRawUploadText("");
       setIsImportModalOpen(false);
-      alert(`Successfully imported ${newImported.length} students into the directory!`);
-    } catch {
-      alert("Import format error. Please enter lines like: Student Name, Class, Parent Name, Phone");
+      toast.success(`Successfully imported ${imported} student(s) into the directory!`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Import failed. Format: Student Name, Class, Parent Name, Phone"));
     }
   };
 
@@ -393,129 +491,133 @@ export default function StudentsDirectory({ scope }: { scope: AcademicScope }) {
       </div>
 
       {/* Student Table */}
-      <div className="rounded-3xl border border-amber-900/10 dark:border-zinc-800 shadow-sm overflow-hidden bg-white dark:bg-zinc-900">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
-            <thead>
-              <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 font-bold uppercase tracking-wider border-b border-amber-900/10 dark:border-zinc-800">
-                <th className="py-3.5 px-6">ID & Year</th>
-                <th className="py-3.5 px-6">Student Name</th>
-                <th className="py-3.5 px-6">Class Stream</th>
-                <th className="py-3.5 px-6">Parent Info</th>
-                <th className="py-3.5 px-6">S3 Result Slip</th>
-                <th className="py-3.5 px-6">Exam Clearance Status</th>
-                <th className="py-3.5 px-6 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-amber-900/10 dark:divide-zinc-800">
-              {filteredStudents.map((stu) => (
-                <tr key={stu.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
-                  <td className="py-4 px-6 font-mono font-bold text-zinc-600 dark:text-zinc-400">
-                    {stu.id}
-                    <p className="text-[10px] text-zinc-400 font-normal">{stu.academicYear} Year</p>
-                  </td>
-                  <td className="py-4 px-6 font-semibold text-zinc-900 dark:text-white">
-                    {stu.fullName}
-                    <p className="text-[10px] text-zinc-400 font-normal">{stu.gender}</p>
-                  </td>
-                  <td className="py-4 px-6 font-bold text-emerald-700 dark:text-emerald-400">
-                    {stu.currentStream || stu.currentClass}
-                  </td>
-                  <td className="py-4 px-6 space-y-0.5">
-                    <p className="font-semibold text-zinc-800 dark:text-zinc-200">{stu.guardianName}</p>
-                    <p className="font-mono text-[10px] text-zinc-500 flex items-center gap-1">
-                      <Phone className="w-3 h-3 text-zinc-400" /> {stu.guardianPhone}
-                    </p>
-                  </td>
-                   <td className="py-4 px-6">
-                    {isS3SlipRequired(stu) ? (
-                      stu.hasS3ResultSlip ? (
-                        <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold text-[11px]">
-                          <CheckCircle2 className="w-4 h-4" /> Attached
-                        </span>
+      {isLoading ? (
+        <TableSkeleton rows={6} cols={7} />
+      ) : (
+        <div className="rounded-3xl border border-amber-900/10 dark:border-zinc-800 shadow-sm overflow-hidden bg-white dark:bg-zinc-900">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse text-xs">
+              <thead>
+                <tr className="bg-zinc-50 dark:bg-zinc-800/50 text-zinc-500 font-bold uppercase tracking-wider border-b border-amber-900/10 dark:border-zinc-800">
+                  <th className="py-3.5 px-6">ID & Year</th>
+                  <th className="py-3.5 px-6">Student Name</th>
+                  <th className="py-3.5 px-6">Class Stream</th>
+                  <th className="py-3.5 px-6">Parent Info</th>
+                  <th className="py-3.5 px-6">S3 Result Slip</th>
+                  <th className="py-3.5 px-6">Exam Clearance Status</th>
+                  <th className="py-3.5 px-6 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-amber-900/10 dark:divide-zinc-800">
+                {filteredStudents.map((stu) => (
+                  <tr key={stu.id} className="hover:bg-zinc-50 dark:hover:bg-zinc-800/30 transition-colors">
+                    <td className="py-4 px-6 font-mono font-bold text-zinc-600 dark:text-zinc-400">
+                      {stu.id}
+                      <p className="text-[10px] text-zinc-400 font-normal">{stu.academicYear} Year</p>
+                    </td>
+                    <td className="py-4 px-6 font-semibold text-zinc-900 dark:text-white">
+                      {stu.fullName}
+                      <p className="text-[10px] text-zinc-400 font-normal">{stu.gender}</p>
+                    </td>
+                    <td className="py-4 px-6 font-bold text-emerald-700 dark:text-emerald-400">
+                      {stu.currentStream || stu.currentClass}
+                    </td>
+                    <td className="py-4 px-6 space-y-0.5">
+                      <p className="font-semibold text-zinc-800 dark:text-zinc-200">{stu.guardianName}</p>
+                      <p className="font-mono text-[10px] text-zinc-500 flex items-center gap-1">
+                        <Phone className="w-3 h-3 text-zinc-400" /> {stu.guardianPhone}
+                      </p>
+                    </td>
+                    <td className="py-4 px-6">
+                      {isS3SlipRequired(stu) ? (
+                        stu.hasS3ResultSlip ? (
+                          <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400 font-bold text-[11px]">
+                            <CheckCircle2 className="w-4 h-4" /> Attached
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-rose-600 font-bold text-[11px]">
+                            <AlertTriangle className="w-4 h-4 text-rose-600" /> Missing Slip
+                          </span>
+                        )
                       ) : (
-                        <span className="inline-flex items-center gap-1 text-rose-600 font-bold text-[11px]">
-                          <AlertTriangle className="w-4 h-4 text-rose-600" /> Missing Slip
+                        <span className="inline-flex items-center gap-1 text-zinc-400 font-bold text-[11px]">
+                          <FileText className="w-4 h-4" /> N/A
                         </span>
-                      )
-                    ) : (
-                      <span className="inline-flex items-center gap-1 text-zinc-400 font-bold text-[11px]">
-                        <FileText className="w-4 h-4" /> N/A
+                      )}
+                    </td>
+                    <td className="py-4 px-6">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                          stu.requirementStatus.includes("Blocked")
+                            ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
+                            : stu.requirementStatus.includes("Pending")
+                            ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+                        }`}
+                      >
+                        {stu.requirementStatus}
                       </span>
-                    )}
-                  </td>
-                  <td className="py-4 px-6">
-                    <span
-                      className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
-                        stu.requirementStatus.includes("Blocked")
-                          ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
-                          : stu.requirementStatus.includes("Pending")
-                          ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
-                          : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
-                      }`}
-                    >
-                      {stu.requirementStatus}
-                    </span>
-                  </td>
+                    </td>
 
-                  {/* Actions Dropdown / Modal triggers */}
-                  <td className="py-4 px-6 text-right relative">
-                    <div className="flex items-center justify-end gap-2">
-                      <button
-                        onClick={() => setActiveDocsStudent(stu)}
-                        className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
-                        title="View Uploaded Documents"
-                      >
-                        <FileText className="w-4 h-4 text-emerald-600" />
-                      </button>
-
-                      <button
-                        onClick={() => setActiveMenuId(activeMenuId === stu.id ? null : stu.id)}
-                        className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors cursor-pointer"
-                      >
-                        <MoreVertical className="w-4 h-4" />
-                      </button>
-                    </div>
-
-                    {/* Popover Menu */}
-                    {activeMenuId === stu.id && (
-                      <div className="absolute right-6 top-12 w-48 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-amber-900/10 dark:border-zinc-700 py-1.5 z-20 text-left">
-                        <Link
-                          href={`/dashboard/${scope}/students/${stu.id}`}
-                          onClick={() => setActiveMenuId(null)}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors"
-                        >
-                          <Eye className="w-3.5 h-3.5 text-sky-600" /> View Student Profile
-                        </Link>
+                    {/* Actions Dropdown / Modal triggers */}
+                    <td className="py-4 px-6 text-right relative">
+                      <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => handleOpenEditModal(stu)}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors cursor-pointer"
+                          onClick={() => setActiveDocsStudent(stu)}
+                          className="p-1.5 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 text-zinc-700 dark:text-zinc-300 transition-colors cursor-pointer"
+                          title="View Uploaded Documents"
                         >
-                          <Edit className="w-3.5 h-3.5 text-emerald-600" /> Edit Student Details
+                          <FileText className="w-4 h-4 text-emerald-600" />
                         </button>
+
                         <button
-                          onClick={() => handleDeleteStudent(stu.id, stu.fullName)}
-                          className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          onClick={() => setActiveMenuId(activeMenuId === stu.id ? null : stu.id)}
+                          className="p-1.5 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 text-zinc-500 transition-colors cursor-pointer"
                         >
-                          <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Delete Student
+                          <MoreVertical className="w-4 h-4" />
                         </button>
                       </div>
-                    )}
-                  </td>
-                </tr>
-              ))}
 
-              {filteredStudents.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-zinc-400 italic">
-                    No students match the selected category, class, year, or search query.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
+                      {/* Popover Menu */}
+                      {activeMenuId === stu.id && (
+                        <div className="absolute right-6 top-12 w-48 bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-amber-900/10 dark:border-zinc-700 py-1.5 z-20 text-left">
+                          <Link
+                            href={`/dashboard/${scope}/students/${stu.id}`}
+                            onClick={() => setActiveMenuId(null)}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors"
+                          >
+                            <Eye className="w-3.5 h-3.5 text-sky-600" /> View Student Profile
+                          </Link>
+                          <button
+                            onClick={() => handleOpenEditModal(stu)}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-zinc-700 dark:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-700/50 transition-colors cursor-pointer"
+                          >
+                            <Edit className="w-3.5 h-3.5 text-emerald-600" /> Edit Student Details
+                          </button>
+                          <button
+                            onClick={() => handleDeleteStudent(stu.id, stu.fullName)}
+                            className="w-full flex items-center gap-2 px-4 py-2 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-colors cursor-pointer"
+                          >
+                            <Trash2 className="w-3.5 h-3.5 text-rose-600" /> Delete Student
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+
+                {filteredStudents.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="py-8 text-center text-zinc-400 italic">
+                      No students match the selected category, class, year, or search query.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Modal 1: View Uploaded Documents */}
       {activeDocsStudent && (
@@ -659,29 +761,44 @@ export default function StudentsDirectory({ scope }: { scope: AcademicScope }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Category & Class</label>
+                  <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Education Category</label>
                   <select
-                    value={currentClass}
-                    onChange={(e) => setCurrentClass(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold"
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as Category)}
+                    className="w-full px-3 py-2 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold cursor-pointer"
                   >
-                    {config.classes.map((cls) => (
-                      <option key={cls} value={cls}>
-                        {cls}
-                      </option>
+                    {config.categories.map((cat) => (
+                      <option key={cat} value={cat}>{cat}</option>
                     ))}
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Assigned Stream</label>
-                  <input
-                    type="text"
-                    placeholder={`e.g. ${config.streams[0]}`}
-                    value={currentStream}
-                    onChange={(e) => setCurrentStream(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white"
-                  />
+                  <label className="block text-[10px] font-bold uppercase text-zinc-500 mb-1">Assigned Class / Stream</label>
+                  <select
+                    value={formSelectedClassId}
+                    onChange={(e) => setFormSelectedClassId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-bold cursor-pointer"
+                  >
+                    <option value="">-- No Class Selected --</option>
+                    {backendClasses
+                      // We can filter by the selected category's scope
+                      .filter((c) => {
+                         const catScope = category === "Primary" ? "PRIMARY" : category === "Nursery" ? "NURSERY" : category === "Lower Secondary" ? "LOWER SECONDARY" : "TVET";
+                         return c.scope === catScope;
+                      })
+                      .map((cls) => {
+                      const enrolled = students.filter(s => s.classId === cls.id).length;
+                      const capacity = 40;
+                      const remaining = Math.max(0, capacity - enrolled);
+                      const isFull = remaining === 0;
+                      return (
+                        <option key={cls.id} value={cls.id} disabled={isFull && (!editingStudent || editingStudent.classId !== cls.id)}>
+                          {cls.className} {cls.tradeName ? `(${cls.tradeName})` : ""} - {isFull ? "FULL" : `${remaining} spaces remain`}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
               </div>
 

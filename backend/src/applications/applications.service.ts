@@ -1,10 +1,25 @@
-import { Injectable, NotFoundException, Inject } from '@nestjs/common';
-import * as schema from '../db/schema'; 
+import { Injectable, NotFoundException, Inject, BadRequestException } from '@nestjs/common';
+import * as schema from '../db/schema';
 import { DRIZZLE } from '../db/db.provider';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
 import { applications, applicationDocuments } from '../db/schema';
 import { eq, and, inArray, sql } from 'drizzle-orm';
 import { SupabaseService } from '../supabase/supabase.service';
+
+// Normalize a free-form gender value (e.g. 'male', 'MALE', ' Female ')
+// into one of the exact Postgres enum values: 'Male' | 'Female'.
+// Rejects missing / unrecognized values because the DB column is NOT NULL.
+function requireGender(value: string | null | undefined): 'Male' | 'Female' {
+  if (!value) {
+    throw new BadRequestException('Gender is required.');
+  }
+  const lower = value.trim().toLowerCase();
+  if (lower === 'male') return 'Male';
+  if (lower === 'female') return 'Female';
+  throw new BadRequestException(
+    `Invalid gender value: "${value}". Expected "Male" or "Female".`,
+  );
+}
 
 @Injectable()
 export class ApplicationsService {
@@ -18,9 +33,13 @@ export class ApplicationsService {
     const serial = Math.floor(1000 + Math.random() * 9000);
     return `CFSG-2026-${initials}${serial}`;
   }
-  private educationLevelsForUser(user: { role?: string; scope?: string }): string[] | null {
+  private educationLevelsForUser(user: {
+    role?: string;
+    scope?: string;
+  }): string[] | null {
     if (user.role === 'Primary-HeadMaster') return ['PRIMARY', 'NURSERY'];
-    if (user.role === 'Secondary-HeadMaster') return ['LOWER SECONDARY', 'TVET'];
+    if (user.role === 'Secondary-HeadMaster')
+      return ['LOWER SECONDARY', 'TVET'];
     if (user.role === 'DOS-Secondary') return ['LOWER SECONDARY'];
     if (user.role === 'DOS-Tvet') return ['TVET'];
     if (user.scope && user.scope !== 'All') return [user.scope];
@@ -32,60 +51,64 @@ export class ApplicationsService {
   }
 
   async submitApplication(data: any, files: Array<Express.Multer.File>) {
-  const relationship =
-    data.relationship === 'Other' ? 'Other Relative' : data.relationship;
-  const referenceCode = this.generateReferenceCode(data.lastName || 'ST');
+    const relationship =
+      data.relationship === 'Other' ? 'Other Relative' : data.relationship;
+    const referenceCode = this.generateReferenceCode(data.lastName || 'ST');
 
-  const [newApp] = await this.db
-    .insert(applications)
-    .values({
-      referenceCode,
-      studentFirstName: data.firstName,
-      studentLastName: data.lastName,
-      gender: data.gender,
-      dateOfBirth: new Date(data.dateOfBirth),
-      educationLevel: data.educationLevel,
-      tradeName: data.tradeName || null,
-      appliedClass: data.appliedClass,
-      previousSchool: data.previousSchool || null,
-      parentName: data.parentName,
-      parentPhone: data.parentPhone,
-      parentEmail: data.parentEmail || null,
-      residentialDescription: data.residentialDescription,
-      relationShipToStudent: relationship,
-      status: 'PENDING',
-    })
-    .returning();
+    const [newApp] = await this.db
+      .insert(applications)
+      .values({
+        referenceCode,
+        studentFirstName: data.firstName,
+        studentLastName: data.lastName,
+        gender: requireGender(data.gender),
+        dateOfBirth: new Date(data.dateOfBirth),
+        educationLevel: data.educationLevel,
+        tradeName: data.tradeName || null,
+        appliedClass: data.appliedClass,
+        previousSchool: data.previousSchool || null,
+        parentName: data.parentName,
+        parentPhone: data.parentPhone,
+        parentEmail: data.parentEmail || null,
+        residentialDescription: data.residentialDescription,
+        relationShipToStudent: relationship,
+        status: 'PENDING',
+      })
+      .returning();
 
-  if (files && files.length > 0) {
-    const documentRecords: any = [];
+    if (files && files.length > 0) {
+      const documentRecords: any = [];
 
-    for (const file of files) {
-      const documentType = file.fieldname || 'document';
-      const { publicUrl, filePath } = await this.supabaseService.uploadFile(
-        file,
-        process.env.SUPABASE_APPLICATIONS_BUCKET || 'students-documents',
-        newApp.id,
-      );
+      for (const file of files) {
+        const documentType = file.fieldname || 'document';
+        const { publicUrl, filePath } = await this.supabaseService.uploadFile(
+          file,
+          process.env.SUPABASE_APPLICATIONS_BUCKET || 'students-documents',
+          newApp.id,
+        );
 
-      documentRecords.push({
-        applicationId: newApp.id,
-        documentType,
-        fileUrl: publicUrl,
-        fileName: filePath,
-      });
+        documentRecords.push({
+          applicationId: newApp.id,
+          documentType,
+          fileUrl: publicUrl,
+          fileName: filePath,
+        });
+      }
+
+      await this.db.insert(applicationDocuments).values(documentRecords);
     }
 
-    await this.db.insert(applicationDocuments).values(documentRecords);
+    return {
+      message: 'Application submitted successfully',
+      referenceCode: newApp.referenceCode,
+      applicationId: newApp.id,
+    };
   }
-
-  return {
-    message: 'Application submitted successfully',
-    referenceCode: newApp.referenceCode,
-    applicationId: newApp.id,
-  };
-}
-  async findAll(user: { role?: string; scope?: string }, status?: string, level?: string) {
+  async findAll(
+    user: { role?: string; scope?: string },
+    status?: string,
+    level?: string,
+  ) {
     const filters: any = [];
     const scopedLevels = this.educationLevelsForUser(user);
 
@@ -120,8 +143,10 @@ export class ApplicationsService {
     }
 
     const scopedLevels = this.educationLevelsForUser(user);
-    if (scopedLevels && !scopedLevels.includes(app.educationLevel as any)) {
-      throw new NotFoundException(`Application not found for your assigned scope`);
+    if (scopedLevels && !scopedLevels.includes(app.educationLevel)) {
+      throw new NotFoundException(
+        `Application not found for your assigned scope`,
+      );
     }
 
     const docs = await this.db
@@ -193,7 +218,11 @@ export class ApplicationsService {
     };
   }
 
-  async updateStatus(id: string, status: 'APPROVED' | 'REJECTED', user: { role?: string; scope?: string }) {
+  async updateStatus(
+    id: string,
+    status: 'APPROVED' | 'REJECTED',
+    user: { role?: string; scope?: string },
+  ) {
     await this.findOne(id, user);
 
     const [updated] = await this.db
@@ -215,9 +244,7 @@ export class ApplicationsService {
       .delete(applicationDocuments)
       .where(eq(applicationDocuments.applicationId, id));
 
-    await this.db
-      .delete(applications)
-      .where(eq(applications.id, id));
+    await this.db.delete(applications).where(eq(applications.id, id));
 
     return {
       message: 'Application deleted successfully.',

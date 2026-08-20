@@ -1,12 +1,67 @@
-import React from "react";
+"use client";
+
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { NEWS_DATA } from "@/exports";
+import api from "@/lib/api";
+import { formatDate } from "@/lib/api-helpers";
+
+interface LiveNewsItem {
+  id: string;
+  slug: string;
+  title: string;
+  summary: string;
+  category: string;
+  createdAt: string;
+}
+
+interface RenderedArticle {
+  id: string;
+  category: string;
+  date: string;
+  title: string;
+  description?: string;
+  slug: string;
+  isFeatured?: boolean;
+}
+
+/** Normalize one item from either the live API or the static fallback into a common shape. */
+function toArticle(item: LiveNewsItem): RenderedArticle {
+  return {
+    id: item.id,
+    category: item.category,
+    date: formatDate(item.createdAt) || "",
+    title: item.title,
+    description: item.summary,
+    slug: item.slug,
+  };
+}
 
 const NewsSection: React.FC = () => {
-  //separete Featured Cards
-  const featuredNews = NEWS_DATA.find((item) => item.isFeatured) || NEWS_DATA[0];
-  const sideNewsList = NEWS_DATA.filter((item) => item.id !== featuredNews.id);
+  const [news, setNews] = useState<RenderedArticle[]>(() =>
+    NEWS_DATA.map((item) => ({ ...item })),
+  );
+
+  useEffect(() => {
+    api
+      .get<LiveNewsItem[]>("/admin/public/news")
+      .then((res) => {
+        const live = Array.isArray(res.data) ? res.data : [];
+        if (live.length > 0) {
+          setNews(live.map(toArticle));
+          return;
+        }
+        setNews(NEWS_DATA.map((item) => ({ ...item })));
+      })
+      .catch(() => {
+        setNews(NEWS_DATA.map((item) => ({ ...item })));
+      });
+  }, []);
+
+  const featuredNews =
+    news.find((item) => item.isFeatured) || news[0] || NEWS_DATA[0];
+  const sideNewsList = news.filter((item) => item.id !== featuredNews.id);
 
   return (
     <section className=" py-16 md:py-24 px-6 lg:px-12">

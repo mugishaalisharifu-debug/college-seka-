@@ -5,6 +5,6 @@ import { DbModule } from 'src/db/db.module';
 @Module({
   imports: [DbModule],
   controllers: [FinanceController],
-  providers: [FinanceService]
+  providers: [FinanceService],
 })
 export class FinanceModule {}

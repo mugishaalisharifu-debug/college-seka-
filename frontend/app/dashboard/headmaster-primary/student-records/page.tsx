@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 import {
   UserPlus,
   Search,
@@ -12,7 +15,6 @@ import {
   Eye,
   Loader2,
 } from "lucide-react";
-import toast from "react-hot-toast";
 
 interface StudentRecord {
   id: string;
@@ -24,6 +26,38 @@ interface StudentRecord {
   parentName: string;
   parentPhone: string;
   enrollmentDate: string;
+}
+
+interface ApiStudent {
+  id: string;
+  studentName: string;
+  gender: "Male" | "Female" | null;
+  dateOfBirth: string | Date;
+  educationLevel: string;
+  classId?: string | null;
+  parentName: string;
+  parentPhone: string;
+  createdAt?: string | Date;
+}
+
+// Map backend students rows to the page's local record shape.
+function apiStudentToRecord(
+  s: ApiStudent,
+  classByName: Record<string, string>,
+): StudentRecord {
+  return {
+    id: s.id,
+    fullName: s.studentName,
+    section: (s.educationLevel === "NURSERY"
+      ? "Nursery"
+      : "Primary") as "Nursery" | "Primary",
+    className: s.classId ? classByName[s.classId] || "" : "",
+    gender: s.gender || "Male",
+    dateOfBirth: s.dateOfBirth ? String(s.dateOfBirth).slice(0, 10) : "",
+    parentName: s.parentName,
+    parentPhone: s.parentPhone,
+    enrollmentDate: s.createdAt ? String(s.createdAt).slice(0, 10) : "",
+  };
 }
 
 export default function PrimaryStudentRecordsPage() {
@@ -51,6 +85,45 @@ export default function PrimaryStudentRecordsPage() {
   const [editingStudent, setEditingStudent] = useState<StudentRecord | null>(null);
   const [activeStudentId, setActiveStudentId] = useState<string | null>(null);
 
+  // Latest class id → class name map used to render student class names.
+  const [classByName, setClassByName] = useState<Record<string, string>>({});
+
+  const reloadStudents = async () => {
+    try {
+      const [classesRes, studentsRes] = await Promise.all([
+        api.get<{ id: string; className: string; scope: string }[]>("/dos/classes"),
+        api.get<ApiStudent[]>("/dos/students"),
+      ]);
+
+      const classByNameRecord: Record<string, string> = {};
+      const classOptions: { name: string; section: string }[] = [];
+
+      (classesRes.data || []).forEach((c) => {
+        classByNameRecord[c.id] = c.className;
+        if (c.className) {
+          classOptions.push({
+            name: c.className,
+            section:
+              c.scope === "NURSERY"
+                ? "Nursery"
+                : ("Primary" as "Nursery" | "Primary"),
+          });
+        }
+      });
+
+      setClassByName(classByNameRecord);
+      setAvailableClasses(classOptions);
+      setStudents((studentsRes.data || []).map((s) => apiStudentToRecord(s, classByNameRecord)));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not load student records."));
+    }
+  };
+
+  useEffect(() => {
+    reloadStudents();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const openAddModal = () => {
     setEditingStudent(null);
     setFullNameInput("");
@@ -73,11 +146,15 @@ export default function PrimaryStudentRecordsPage() {
     setIsModalOpen(true);
   };
 
-  const handleDeleteStudent = (id: string) => {
-    if (confirm("Are you sure you want to delete this student record? This action cannot be undone.")) {
-      setStudents((prev) => prev.filter((s) => s.id !== id));
+  const handleDeleteStudent = async (id: string) => {
+    if (!confirm("Are you sure you want to delete this student record? This action cannot be undone.")) return;
+    try {
+      await api.delete(`/dos/students/${id}`);
       if (activeStudentId === id) setActiveStudentId(null);
       toast.success("Student record deleted successfully");
+      await reloadStudents();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to delete the student."));
     }
   };
 
@@ -102,39 +179,26 @@ export default function PrimaryStudentRecordsPage() {
     try {
       const classObj = availableClasses.find((c) => c.name === selectedClassInput);
       const section = (classObj?.section as "Nursery" | "Primary") || "Primary";
+      const classId =
+        Object.keys(classByName).find((key) => classByName[key] === selectedClassInput) || null;
+
+      const payload = {
+        studentName: fullNameInput.trim(),
+        gender: genderInput,
+        dateOfBirth: dobInput ? new Date(dobInput).toISOString() : new Date().toISOString(),
+        educationLevel: section === "Nursery" ? "NURSERY" : "PRIMARY",
+        classId,
+        parentName: parentNameInput.trim(),
+        parentPhone: parentPhoneInput.trim(),
+        studentType: "DAY",
+        status: "ACTIVE",
+      };
 
       if (editingStudent) {
-        setStudents((prev) =>
-          prev.map((s) =>
-            s.id === editingStudent.id
-              ? {
-                  ...s,
-                  fullName: fullNameInput.trim(),
-                  section,
-                  className: selectedClassInput,
-                  gender: genderInput,
-                  dateOfBirth: dobInput || s.dateOfBirth,
-                  parentName: parentNameInput.trim(),
-                  parentPhone: parentPhoneInput.trim(),
-                }
-              : s,
-          ),
-        );
+        await api.patch(`/dos/students/${editingStudent.id}`, payload);
         toast.success("Student information updated successfully!");
       } else {
-        const newStudent: StudentRecord = {
-          id: `STU-2026-00${students.length + 1}`,
-          fullName: fullNameInput.trim(),
-          section: section,
-          className: selectedClassInput,
-          gender: genderInput,
-          dateOfBirth: dobInput || "2020-01-01",
-          parentName: parentNameInput.trim(),
-          parentPhone: parentPhoneInput.trim(),
-          enrollmentDate: new Date().toISOString().split("T")[0],
-        };
-
-        setStudents([newStudent, ...students]);
+        await api.post("/dos/students", payload);
         toast.success("Student enrolled successfully!");
       }
 
@@ -144,8 +208,10 @@ export default function PrimaryStudentRecordsPage() {
       setDobInput("");
       setParentNameInput("");
       setParentPhoneInput("");
-    } catch {
-      toast.error("An error occurred while saving student record.");
+
+      await reloadStudents();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "An error occurred while saving student record."));
     } finally {
       setIsSaving(false);
     }

@@ -1,8 +1,8 @@
-import "dotenv/config";
-import { Pool } from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { eq, sql } from "drizzle-orm";
-import * as schema from "./schema";
+import 'dotenv/config';
+import { Pool } from 'pg';
+import { drizzle } from 'drizzle-orm/node-postgres';
+import { eq, sql } from 'drizzle-orm';
+import * as schema from './schema';
 
 const pool = new Pool({
   connectionString: process.env.DB_URL,
@@ -11,7 +11,7 @@ const pool = new Pool({
 const db = drizzle(pool, { schema });
 
 async function main() {
-  console.log("🔍 Checking for duplicate users...\n");
+  console.log('🔍 Checking for duplicate users...\n');
 
   // Find duplicate emails
   const duplicates = await db.execute(sql`
@@ -24,7 +24,7 @@ async function main() {
   const duplicateRows = duplicates.rows as { email: string; count: number }[];
 
   if (duplicateRows.length === 0) {
-    console.log("✅ No duplicate users found.");
+    console.log('✅ No duplicate users found.');
     await pool.end();
     return;
   }
@@ -53,11 +53,11 @@ async function main() {
     }
   }
 
-  console.log("\n✅ Deduplication complete.");
+  console.log('\n✅ Deduplication complete.');
   await pool.end();
 }
 
 main().catch((err) => {
-  console.error("❌ Deduplication failed:", err);
+  console.error('❌ Deduplication failed:', err);
   process.exit(1);
 });

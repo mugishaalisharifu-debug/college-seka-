@@ -56,7 +56,9 @@ export class CloudinaryService {
 
   deleteImage(publicId: string): Promise<{ result: string }> {
     if (!publicId) {
-      throw new BadRequestException('Public ID is required for image deletion.');
+      throw new BadRequestException(
+        'Public ID is required for image deletion.',
+      );
     }
 
     return new Promise((resolve, reject) => {

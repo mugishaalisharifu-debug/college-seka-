@@ -1,6 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
+import { STAFF_DATA } from "@/exports";
 import {
   Boxes,
   Plus,
@@ -15,6 +19,7 @@ import {
   Sparkles,
   BookOpen,
 } from "lucide-react";
+import { CardSkeleton, StatSkeleton } from "@/components/ui/Skeleton";
 import { AcademicScope, EducationCategory, getScopeConfig } from "@/lib/role-scope";
 
 interface Teacher {
@@ -35,15 +40,111 @@ interface SchoolClass {
 
 
 
+// Backend `scope` → local UI category.
+function scopeToCategory(scope: string): EducationCategory {
+  switch (scope) {
+    case "NURSERY":
+      return "Nursery";
+    case "PRIMARY":
+      return "Primary";
+    case "LOWER SECONDARY":
+      return "Lower Secondary";
+    case "TVET":
+      return "TVET";
+    default:
+      return "Primary";
+  }
+}
+
+// Local UI category → backend `scope`.
+function categoryToScope(category: EducationCategory): string {
+  switch (category) {
+    case "Nursery":
+      return "NURSERY";
+    case "Primary":
+      return "PRIMARY";
+    case "Lower Secondary":
+      return "LOWER SECONDARY";
+    case "TVET":
+      return "TVET";
+    default:
+      return "PRIMARY";
+  }
+}
+
+interface BackendClass {
+  id: string;
+  className: string;
+  scope: string;
+  tradeName?: string | null;
+}
+
+// Backend class rows → local UI shape.
+function mapClasses(rows: BackendClass[]): SchoolClass[] {
+  return (rows || []).map((c) => ({
+    id: c.id,
+    category: scopeToCategory(c.scope),
+    tradeName: c.tradeName || undefined,
+    levelName: c.className,
+    capacity: 40,
+    enrolled: 0,
+    classTeacherId: undefined,
+  }));
+}
+
+
 export default function ClassesManager({ scope }: { scope: AcademicScope }) {
   const config = getScopeConfig(scope);
   const supportsTrades = scope === "tvet";
 
   const [classes, setClasses] = useState<SchoolClass[]>([]);
-  const EMPTY_TEACHERS: Teacher[] = [];
+  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [availableTeachers, setAvailableTeachers] = useState<Teacher[]>([]);
   const [tvetTrades, setTvetTrades] = useState<string[]>(config.streams);
   const [activeTab, setActiveTab] = useState<EducationCategory>(config.categories[0]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  useEffect(() => {
+    // Load teachers from localStorage or fallback
+    try {
+      const saved = localStorage.getItem("cfsg_staff_directory");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setAvailableTeachers(parsed.map((p: any) => ({ id: p.id, name: p.name, specialty: p.role || p.department })));
+          return;
+        }
+      }
+    } catch (e) {}
+    
+    // Fallback if local storage is empty
+    setAvailableTeachers(STAFF_DATA.map((p: any) => ({ id: p.id, name: p.name, specialty: p.role || p.department })));
+  }, []);
+
+  useEffect(() => {
+    async function load() {
+      setIsLoading(true);
+      try {
+        const [classesRes, studentsRes] = await Promise.all([
+          api.get<BackendClass[]>("/dos/classes"),
+          api.get<{classId?: string}[]>("/dos/students")
+        ]);
+        
+        const students = studentsRes.data || [];
+        const mappedClasses = mapClasses(classesRes.data).map(c => {
+          c.enrolled = students.filter(s => s.classId === c.id).length;
+          return c;
+        });
+        
+        setClasses(mappedClasses);
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "Could not load classes."));
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    load();
+  }, []);
 
   // Modals State
   const [isAddClassModalOpen, setIsAddClassModalOpen] = useState(false);
@@ -83,14 +184,24 @@ export default function ClassesManager({ scope }: { scope: AcademicScope }) {
     setIsEditClassModalOpen(true);
   };
 
-  const handleDeleteClass = (cls: SchoolClass) => {
+  const handleDeleteClass = async (cls: SchoolClass) => {
     if (cls.enrolled > 0) {
       alert(`Cannot delete ${cls.levelName}! It currently has ${cls.enrolled} enrolled students. Please reassign or promote the students first.`);
       return;
     }
 
-    if (confirm(`Are you sure you want to delete class: "${cls.levelName}"?`)) {
-      setClasses((prev) => prev.filter((c) => c.id !== cls.id));
+    if (!confirm(`Are you sure you want to delete class: "${cls.levelName}"?`)) return;
+    try {
+      await api.delete(`/dos/classes/${cls.id}`);
+      const [classesRes, studentsRes] = await Promise.all([
+        api.get<BackendClass[]>("/dos/classes"),
+        api.get<{classId?: string}[]>("/dos/students")
+      ]);
+      const students = studentsRes.data || [];
+      setClasses(mapClasses(classesRes.data).map(c => ({...c, enrolled: students.filter(s => s.classId === c.id).length})));
+      toast.success("Class deleted successfully.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to delete the class."));
     }
   };
 
@@ -104,54 +215,52 @@ export default function ClassesManager({ scope }: { scope: AcademicScope }) {
     setIsAddTradeModalOpen(false);
   };
 
-  const handleCreateClass = (e: React.FormEvent) => {
+  const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formLevel.trim()) return;
 
-    const slug = formLevel.trim().replace(/[^a-zA-Z0-9]+/g, "-").toUpperCase();
-    let id = `CLS-${slug}`;
-    let suffix = 2;
-    while (classes.some((c) => c.id === id)) {
-      id = `CLS-${slug}-${suffix}`;
-      suffix += 1;
+    try {
+      await api.post("/dos/classes", {
+        className: formLevel.trim(),
+        scope: categoryToScope(formCategory),
+        tradeName: supportsTrades ? formTrade || null : null,
+      });
+      const [classesRes, studentsRes] = await Promise.all([
+        api.get<BackendClass[]>("/dos/classes"),
+        api.get<{classId?: string}[]>("/dos/students")
+      ]);
+      const students = studentsRes.data || [];
+      setClasses(mapClasses(classesRes.data).map(c => ({...c, enrolled: students.filter(s => s.classId === c.id).length})));
+      setIsAddClassModalOpen(false);
+      resetForm();
+      toast.success("Class created successfully.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to create the class."));
     }
-
-    const newClassObj: SchoolClass = {
-      id,
-      category: formCategory,
-      tradeName: supportsTrades ? formTrade : undefined,
-      levelName: formLevel.trim(),
-      capacity: formCapacity,
-      enrolled: 0,
-      classTeacherId: formTeacherId || undefined,
-    };
-
-    setClasses([...classes, newClassObj]);
-    setIsAddClassModalOpen(false);
-    resetForm();
   };
 
-  const handleUpdateClass = (e: React.FormEvent) => {
+  const handleUpdateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingClassId || !formLevel.trim()) return;
 
-    setClasses((prev) =>
-      prev.map((c) =>
-        c.id === editingClassId
-          ? {
-              ...c,
-              category: formCategory,
-              tradeName: supportsTrades ? formTrade : undefined,
-              levelName: formLevel.trim(),
-              capacity: formCapacity,
-              classTeacherId: formTeacherId || undefined,
-            }
-          : c
-      )
-    );
-
-    setIsEditClassModalOpen(false);
-    resetForm();
+    try {
+      await api.patch(`/dos/classes/${editingClassId}`, {
+        className: formLevel.trim(),
+        scope: categoryToScope(formCategory),
+        tradeName: supportsTrades ? formTrade || null : null,
+      });
+      const [classesRes, studentsRes] = await Promise.all([
+        api.get<BackendClass[]>("/dos/classes"),
+        api.get<{classId?: string}[]>("/dos/students")
+      ]);
+      const students = studentsRes.data || [];
+      setClasses(mapClasses(classesRes.data).map(c => ({...c, enrolled: students.filter(s => s.classId === c.id).length})));
+      setIsEditClassModalOpen(false);
+      resetForm();
+      toast.success("Class updated successfully.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to update the class."));
+    }
   };
 
   const handleAssignTeacher = (classId: string, teacherId: string) => {
@@ -296,8 +405,11 @@ export default function ClassesManager({ scope }: { scope: AcademicScope }) {
       </div>
 
       {/* Class Cards Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {filteredClasses.map((cls) => {
+      {isLoading ? (
+        <CardSkeleton count={6} />
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredClasses.map((cls) => {
           const effectiveEnrolled = cls.enrolled;
           const seatsAvailable = cls.capacity - effectiveEnrolled;
           const isFull = seatsAvailable <= 0;
@@ -376,7 +488,7 @@ export default function ClassesManager({ scope }: { scope: AcademicScope }) {
                     className="w-full px-3 py-1.5 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/90 text-xs font-semibold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-700 cursor-pointer"
                   >
                     <option value="">-- Unassigned --</option>
-                    {EMPTY_TEACHERS.map((teacher) => (
+                    {availableTeachers.map((teacher) => (
                       <option key={teacher.id} value={teacher.id}>
                         {teacher.name} ({teacher.specialty})
                       </option>
@@ -411,6 +523,7 @@ export default function ClassesManager({ scope }: { scope: AcademicScope }) {
           </div>
         )}
       </div>
+      )}
 
       {/* Modal: Add TVET Trade */}
       {isAddTradeModalOpen && (
@@ -522,7 +635,7 @@ export default function ClassesManager({ scope }: { scope: AcademicScope }) {
                   className="w-full px-3 py-2 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium cursor-pointer"
                 >
                   <option value="">-- Select Teacher --</option>
-                  {EMPTY_TEACHERS.map((t) => (
+                  {availableTeachers.map((t) => (
                     <option key={t.id} value={t.id}>{t.name} ({t.specialty})</option>
                   ))}
                 </select>
@@ -625,7 +738,7 @@ export default function ClassesManager({ scope }: { scope: AcademicScope }) {
                   className="w-full px-3 py-2 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white font-medium cursor-pointer"
                 >
                   <option value="">-- Select Teacher --</option>
-                  {EMPTY_TEACHERS.map((t) => (
+                  {availableTeachers.map((t) => (
                     <option key={t.id} value={t.id}>{t.name} ({t.specialty})</option>
                   ))}
                 </select>

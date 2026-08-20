@@ -32,6 +32,18 @@ interface LoginResponse {
   };
 }
 
+const DEMO_ACCOUNTS = [
+  { role: "Master Administrator", email: "admin@college.com", pass: "admin12345", badge: "Admin" },
+  { role: "DOS Secondary", email: "dos.secondary@college.com", pass: "admin12345", badge: "Lower Secondary" },
+  { role: "DOS TVET", email: "dos.tvet@college.com", pass: "admin12345", badge: "TVET" },
+  { role: "Primary Headmaster", email: "headmaster.primary@college.com", pass: "admin12345", badge: "Primary" },
+  { role: "Secondary Headmaster", email: "headmaster.secondary@college.com", pass: "admin12345", badge: "Secondary & TVET" },
+  { role: "School Bursar", email: "bursar@college.com", pass: "admin12345", badge: "Finance" },
+  { role: "School Cashier", email: "cashier@college.com", pass: "admin12345", badge: "POS & Stock" },
+  { role: "Store Manager", email: "store@college.com", pass: "admin12345", badge: "Inventory" },
+  { role: "School Receptionist", email: "reception@college.com", pass: "admin12345", badge: "Requirements" },
+];
+
 export default function StaffLoginPage() {
   const router = useRouter();
 
@@ -205,6 +217,47 @@ export default function StaffLoginPage() {
           </div>
 
         </div>
+
+        {/* Quick Demo Accounts Helper */}
+        <div className="mt-8 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs space-y-4">
+          <div className="flex items-center justify-between border-b border-zinc-100 dark:border-zinc-800 pb-3">
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200">
+                Institutional Demo Credentials
+              </h3>
+              <p className="text-[11px] text-zinc-500">
+                Click any role to autofill login credentials (Password: <code className="bg-zinc-100 dark:bg-zinc-800 px-1 py-0.5 rounded font-mono font-bold text-emerald-700">admin12345</code>)
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
+            {DEMO_ACCOUNTS.map((acc) => (
+              <button
+                key={acc.email}
+                type="button"
+                onClick={() => {
+                  setEmail(acc.email);
+                  setPassword(acc.pass);
+                }}
+                className="p-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 hover:border-emerald-600 dark:hover:border-emerald-500 bg-zinc-50 dark:bg-zinc-800/40 text-left transition-all group flex flex-col justify-between cursor-pointer"
+              >
+                <div className="flex items-center justify-between w-full">
+                  <span className="font-bold text-zinc-900 dark:text-white group-hover:text-emerald-700 dark:group-hover:text-emerald-400">
+                    {acc.role}
+                  </span>
+                  <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300">
+                    {acc.badge}
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-zinc-500 mt-1">
+                  {acc.email}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
       </div>
     </main>
   );

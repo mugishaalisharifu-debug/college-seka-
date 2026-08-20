@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   ArrowLeft,
   GraduationCap,
@@ -20,9 +20,13 @@ import {
   Printer,
   Download,
   Hash,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import { useParams, useRouter } from "next/navigation";
 import { AcademicScope, EducationCategory, getScopeConfig } from "@/lib/role-scope";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 
 // ==========================================
 // TYPES & MOCK DATA
@@ -62,47 +66,180 @@ interface StudentProfileData {
   requirements: RequirementItem[];
 }
 
-// Mock full profile for a specific student
-const STUDENT_PROFILE: StudentProfileData = {
-  id: "STU-2026-001",
-  fullName: "Jean Paul Nshimiyimana",
-  gender: "Male",
-  dob: "2009-04-12",
-  nationalId: "1 2009 04 123 00012",
-  category: "TVET",
-  className: "Level 4 (L4)",
-  stream: "L4 Software Dev - Stream A",
-  admissionNo: "CFSG-2026-8941",
-  guardianName: "Pierre Mugisha",
-  guardianPhone: "+250 788 123 456",
-  guardianEmail: "p.mugisha@gmail.com",
-  termFee: 290000,
-  arrears: 50000,
-  totalPaid: 240000,
-  feeHistory: [
-    { id: "TX-901", receiptNo: "REC-2026-0881", date: "2026-08-05", amount: 150000, method: "Mobile Money", period: "2026 - Term 1", remarks: "Partial fee payment" },
-    { id: "TX-902", receiptNo: "REC-2026-0890", date: "2026-08-10", amount: 90000, method: "Bank Transfer", period: "2026 - Term 1", remarks: "Balance clearance on arrears" },
-  ],
-  requirements: [
-    { label: "Birth Certificate", status: "Received" },
-    { label: "Previous School Report", status: "Received" },
-    { label: "Passport Photo", status: "Received" },
-    { label: "Medical Report", status: "Pending Review" },
-    { label: "School Uniform", status: "Received" },
-    { label: "TVET Practical Kit", status: "Not Received" },
-  ],
-};
+// Backend row shapes used to build the dynamic profile.
+interface BackendStudent {
+  id: string;
+  regNumber?: string | null;
+  studentName: string;
+  gender: "Male" | "Female" | null;
+  dateOfBirth?: string | null;
+  educationLevel: string;
+  tradeName?: string | null;
+  classId?: string | null;
+  parentName: string;
+  parentPhone: string;
+  studentType?: string;
+  status?: string;
+}
+
+interface BackendClass {
+  id: string;
+  className: string;
+  scope: string;
+  tradeName?: string | null;
+}
+
+interface BackendPayment {
+  id: string;
+  receiptNo: string;
+  amountPaid: string | number;
+  academicPeriod: string;
+  remarks?: string | null;
+  createdAt: string;
+}
+
+function backendLevelToCategory(level: string): EducationCategory {
+  switch (level) {
+    case "NURSERY":
+      return "Nursery";
+    case "PRIMARY":
+      return "Primary";
+    case "LOWER SECONDARY":
+      return "Lower Secondary";
+    case "TVET":
+      return "TVET";
+    default:
+      return "Primary";
+  }
+}
+
+// Standard registration checklist shown on the Requirements tab.
+// Day-to-day verification is performed by the Requirement Collector office.
+const DEFAULT_REQUIREMENTS: RequirementItem[] = [
+  { label: "Birth Certificate", status: "Pending Review" },
+  { label: "Previous School Report", status: "Pending Review" },
+  { label: "Passport Photo", status: "Pending Review" },
+  { label: "Medical Report", status: "Pending Review" },
+  { label: "School Uniform", status: "Pending Review" },
+];
 
 export default function StudentProfile({ scope }: { scope: AcademicScope }) {
   const config = getScopeConfig(scope);
+  const params = useParams();
+  const studentId = (params?.id as string) || "";
 
   const [activeTab, setActiveTab] = useState<
     "overview" | "fees" | "requirements"
   >("overview");
 
-  const profile = STUDENT_PROFILE;
+  const [profile, setProfile] = useState<StudentProfileData | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const netOutstanding = profile.arrears + profile.termFee - profile.totalPaid;
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [studentsRes, classesRes] = await Promise.all([
+          api.get<BackendStudent[]>("/dos/students"),
+          api.get<BackendClass[]>("/dos/classes"),
+        ]);
+
+        // Bursar-only route; DOS sees an empty ledger when the route is not accessible.
+        const paymentsData: BackendPayment[] = await api
+          .get<BackendPayment[]>(
+            studentId ? `/finance/payments?studentId=${studentId}` : "/finance/payments",
+          )
+          .then((r) => r.data)
+          .catch(() => [] as BackendPayment[]);
+
+        if (cancelled) return;
+
+        const stu = (studentsRes.data || []).find((s) => s.id === studentId);
+        if (!stu) {
+          setLoadError("Student not found in the database.");
+          return;
+        }
+
+        const classMap = new Map(
+          (classesRes.data || []).map((c) => [c.id, c.className]),
+        );
+        const className = stu.classId && classMap.get(stu.classId) ? classMap.get(stu.classId)! : "";
+
+        const feeHistory: FeeRecord[] = (paymentsData || []).map((p) => ({
+          id: p.id,
+          receiptNo: p.receiptNo,
+          date: new Date(p.createdAt).toISOString().slice(0, 10),
+          amount: Number(p.amountPaid) || 0,
+          method: "Paid",
+          period: p.academicPeriod || "",
+          remarks: p.remarks || "",
+        }));
+
+        const totalPaid = feeHistory.reduce((sum, f) => sum + f.amount, 0);
+
+        setProfile({
+          id: stu.id,
+          fullName: stu.studentName || "Unnamed Student",
+          gender: stu.gender || "Male",
+          dob: stu.dateOfBirth ? new Date(stu.dateOfBirth).toISOString().slice(0, 10) : "—",
+          nationalId: stu.regNumber || stu.id,
+          category: backendLevelToCategory(stu.educationLevel),
+          className: className || stu.tradeName || stu.educationLevel,
+          stream: stu.tradeName || "",
+          admissionNo: stu.regNumber || stu.id,
+          guardianName: stu.parentName || "—",
+          guardianPhone: stu.parentPhone || "—",
+          guardianEmail: "",
+          termFee: 0,
+          arrears: 0,
+          totalPaid,
+          feeHistory,
+          requirements: DEFAULT_REQUIREMENTS,
+        });
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(getApiErrorMessage(error, "Could not load the student profile."));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, scope]);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center gap-3 py-20 text-xs font-bold text-zinc-500">
+        <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+        Loading student profile from the database...
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="rounded-3xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/30 p-8 text-center space-y-3">
+        <AlertCircle className="w-8 h-8 text-rose-600 mx-auto" />
+        <h2 className="font-bold text-rose-800 dark:text-rose-300 text-base">
+          Student profile unavailable
+        </h2>
+        <p className="text-xs text-rose-700 dark:text-rose-400">{loadError}</p>
+        <Link
+          href={`${config.basePath}/students`}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs"
+        >
+          <ArrowLeft className="w-4 h-4" /> Back to Student Directory
+        </Link>
+      </div>
+    );
+  }
+
+  const netOutstanding = Math.max(0, profile.arrears + profile.termFee - profile.totalPaid);
   const requirementReceived = profile.requirements.filter((r) => r.status === "Received").length;
 
   const tabs = [

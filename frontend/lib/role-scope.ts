@@ -45,12 +45,13 @@ export const TVET_CLASSES = [
 ];
 
 export const TVET_TRADES = [
-  "Software Development",
+  "Accounting",
   "Food Processing",
   "Mechanics",
   "Automobile Technology",
   "Agriculture",
   "Veterinary",
+  "Not Available",
 ];
 
 export const SCOPE_CONFIG: Record<AcademicScope, ScopeConfig> = {

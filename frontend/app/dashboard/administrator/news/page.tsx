@@ -92,6 +92,9 @@ export default function AdministratorNewsPage() {
 
   useEffect(() => {
     loadArticles();
+    if (typeof window !== "undefined" && window.location.search.includes("action=add")) {
+      openAdd();
+    }
   }, []);
 
   const handleTitleChange = (title: string) => {
@@ -107,7 +110,7 @@ export default function AdministratorNewsPage() {
     }));
   };
 
-  const openAdd = () => {
+  function openAdd() {
     setEditing(null);
     setForm({
       title: "",
@@ -123,9 +126,9 @@ export default function AdministratorNewsPage() {
       status: "Published",
     });
     setShowModal(true);
-  };
+  }
 
-  const openEdit = (n: NewsArticle) => {
+  function openEdit(n: NewsArticle) {
     setEditing(n);
     setForm({
       title: n.title,

@@ -11,9 +11,7 @@ import { eq, and, sql } from 'drizzle-orm';
 
 @Injectable()
 export class RequirementsService {
-  constructor(
-    @Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>
-  ) {}
+  constructor(@Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>) {}
 
   // Fetch all requirements with linked class names
   async getMasterItems() {
@@ -32,7 +30,7 @@ export class RequirementsService {
       .from(schema.requirementItems)
       .leftJoin(
         schema.classes,
-        eq(schema.requirementItems.classId, schema.classes.id)
+        eq(schema.requirementItems.classId, schema.classes.id),
       )
       .orderBy(schema.requirementItems.name);
   }
@@ -95,6 +93,45 @@ export class RequirementsService {
     }
 
     return item;
+  }
+
+  async updateMasterItem(
+    id: string,
+    dto: {
+      name?: string;
+      category?:
+        'Boarding / Tools' | 'Academic Supplies' | 'Personal Care / Fees';
+      scope?: any;
+      classId?: string;
+      academicYear?: string;
+      description?: string;
+    },
+  ) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.requirementItems)
+      .where(eq(schema.requirementItems.id, id));
+
+    if (!existing) {
+      throw new NotFoundException('Requirement item not found.');
+    }
+
+    const [updated] = await this.db
+      .update(schema.requirementItems)
+      .set({
+        ...(dto.name && { name: dto.name.trim() }),
+        ...(dto.category && { category: dto.category }),
+        ...(dto.scope && { scope: dto.scope }),
+        ...(dto.classId !== undefined && { classId: dto.classId || null }),
+        ...(dto.academicYear && { academicYear: dto.academicYear.trim() }),
+        ...(dto.description !== undefined && {
+          description: dto.description?.trim() || null,
+        }),
+      })
+      .where(eq(schema.requirementItems.id, id))
+      .returning();
+
+    return updated;
   }
 
   async deleteMasterItem(id: string) {
@@ -162,7 +199,7 @@ export class RequirementsService {
       academicYear: string;
       term: 'TERM_1' | 'TERM_2' | 'TERM_3';
     },
-    inspectorId: string
+    inspectorId: string,
   ) {
     const [student] = await this.db
       .select()
@@ -226,8 +263,8 @@ export class RequirementsService {
                 eq(schema.studentStoreDeposits.studentId, studentId),
                 eq(schema.studentStoreDeposits.storeItemId, storeItem.id),
                 eq(schema.studentStoreDeposits.academicYear, dto.academicYear),
-                eq(schema.studentStoreDeposits.term, dto.term)
-              )
+                eq(schema.studentStoreDeposits.term, dto.term),
+              ),
             );
 
           if (!existingDeposit) {

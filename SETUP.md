@@ -37,15 +37,33 @@ cd backend
 npm install
 npm run db:push     # create tables from the Drizzle schema
 npm run db:seed     # seed the nine staff accounts
+npm run db:seed-downloads  # seed the five public PDF documents into the downloads table
 npm run start:dev   # http://localhost:5000/api
 ```
 
-Seeded logins are `admin@school.rw`, `bursar@school.rw`, `cashier@school.rw`,
-`sec.headmaster@school.rw`, `prim.headmaster@school.rw`, `dos.secondary@school.rw`,
-`dos.tvet@school.rw`, `store.manager@school.rw`, `receptionist@school.rw`,
-all with the seed password in `backend/src/seed/seed.ts`.
+Seeded logins — all 9 accounts use the same password **`admin12345`**:
 
-Login is rate limited; repeated attempts return `429 ThrottlerException`. Wait a minute.
+| Role | Email | Dashboard |
+|---|---|---|
+| Admin | `admin@college.com` | `/dashboard/administrator` |
+| Secondary Headmaster | `master@college.com` | `/dashboard/headmaster-secondary-tvet` |
+| Primary Headmaster | `headmaster.primary@college.com` | `/dashboard/headmaster-primary` |
+| DOS Secondary | `dos.secondary@college.com` | `/dashboard/dos-secondary` |
+| DOS TVET | `dos.tvet@college.com` | `/dashboard/dos-tvet` |
+| Bursar | `bursar@college.com` | `/dashboard/bursar` |
+| Cashier | `cashier@college.com` | `/dashboard/cashier` |
+| Store Manager | `store.manager@school.rw` | `/dashboard/store-manager` |
+| Receptionist | `reception@college.com` | `/dashboard/requirement-collector` |
+
+> If a fresh install is done with `npm run db:seed` (`src/seed/seed.ts`), the accounts
+> use `@school.rw` emails with the password `Password123!` instead. To force the
+> `@college.com` / `admin12345` accounts above, run:
+> `npx tsx src/db/seed.ts`
+> and then `npx tsx src/db/fix-master-password.ts` to normalize the Secondary
+> Headmaster password.
+
+Login is rate limited to 3 attempts per 30 seconds; repeated attempts return
+`429 ThrottlerException`. Wait ~30 seconds.
 
 ## 4. Frontend
 

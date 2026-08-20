@@ -11,9 +11,7 @@ import { eq, desc, sql } from 'drizzle-orm';
 
 @Injectable()
 export class StoreManagerService {
-  constructor(
-    @Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>
-  ) {}
+  constructor(@Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>) {}
 
   async getCollectedStock() {
     return await this.db
@@ -89,9 +87,7 @@ export class StoreManagerService {
       .delete(schema.studentStoreDeposits)
       .where(eq(schema.studentStoreDeposits.storeItemId, id));
 
-    await this.db
-      .delete(schema.storeItems)
-      .where(eq(schema.storeItems.id, id));
+    await this.db.delete(schema.storeItems).where(eq(schema.storeItems.id, id));
 
     return { message: 'Stock item deleted successfully.' };
   }
@@ -111,11 +107,11 @@ export class StoreManagerService {
       .from(schema.storeTransactions)
       .innerJoin(
         schema.storeItems,
-        eq(schema.storeTransactions.storeItemId, schema.storeItems.id)
+        eq(schema.storeTransactions.storeItemId, schema.storeItems.id),
       )
       .innerJoin(
         schema.users,
-        eq(schema.storeTransactions.recordedBy, schema.users.id)
+        eq(schema.storeTransactions.recordedBy, schema.users.id),
       )
       .orderBy(desc(schema.storeTransactions.createdAt));
   }
@@ -127,7 +123,7 @@ export class StoreManagerService {
       department: string;
       notes?: string;
     },
-    userId: string
+    userId: string,
   ) {
     if (dto.quantity <= 0) {
       throw new BadRequestException('Quantity must be greater than zero.');

@@ -155,4 +155,99 @@ export class AuthService {
       user: updatedUser,
     };
   }
+
+  // Create a new staff account
+  async createStaffAccount(dto: {
+    name: string;
+    email: string;
+    role: any;
+    scope?: any;
+    password?: string;
+  }) {
+    const { name, email, role, scope, password } = dto;
+    if (!name || !email || !role) {
+      throw new BadRequestException('Name, email, and role are required.');
+    }
+
+    const [existing] = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.email, email.trim()));
+
+    if (existing) {
+      throw new BadRequestException('A user with this email already exists.');
+    }
+
+    const rawPassword =
+      password && password.length >= 6 ? password : 'admin12345';
+    const hashedPassword = await bcrypt.hash(rawPassword, 10);
+
+    const [newUser] = await this.db
+      .insert(schema.users)
+      .values({
+        name: name.trim(),
+        email: email.trim(),
+        role,
+        scope: scope || 'All',
+        password: hashedPassword,
+      })
+      .returning({
+        id: schema.users.id,
+        name: schema.users.name,
+        email: schema.users.email,
+        role: schema.users.role,
+        scope: schema.users.scope,
+      });
+
+    return newUser;
+  }
+
+  // Update a staff account details
+  async updateStaffAccount(
+    userId: string,
+    dto: { name?: string; email?: string; role?: any; scope?: any },
+  ) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+
+    if (!existing) {
+      throw new NotFoundException('User account not found.');
+    }
+
+    const [updatedUser] = await this.db
+      .update(schema.users)
+      .set({
+        ...(dto.name && { name: dto.name.trim() }),
+        ...(dto.email && { email: dto.email.trim() }),
+        ...(dto.role && { role: dto.role }),
+        ...(dto.scope && { scope: dto.scope }),
+      })
+      .where(eq(schema.users.id, userId))
+      .returning({
+        id: schema.users.id,
+        name: schema.users.name,
+        email: schema.users.email,
+        role: schema.users.role,
+        scope: schema.users.scope,
+      });
+
+    return updatedUser;
+  }
+
+  // Delete a staff account
+  async deleteStaffAccount(userId: string) {
+    const [existing] = await this.db
+      .select()
+      .from(schema.users)
+      .where(eq(schema.users.id, userId));
+
+    if (!existing) {
+      throw new NotFoundException('User account not found.');
+    }
+
+    await this.db.delete(schema.users).where(eq(schema.users.id, userId));
+    return { message: `Account ${existing.email} deleted successfully.` };
+  }
 }

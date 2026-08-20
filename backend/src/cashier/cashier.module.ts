@@ -6,6 +6,6 @@ import { DbModule } from 'src/db/db.module';
 @Module({
   imports: [DbModule],
   controllers: [InventoryController],
-  providers: [InventoryService]
+  providers: [InventoryService],
 })
 export class CashierModule {}

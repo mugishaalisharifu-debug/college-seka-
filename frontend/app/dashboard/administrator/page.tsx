@@ -13,8 +13,11 @@ import {
   Clock,
   Eye,
   Loader2,
+  RotateCcw,
+  FolderOpen,
 } from "lucide-react";
 import Link from "next/link";
+import toast from "react-hot-toast";
 import api from "@/lib/api";
 import { getApiErrorMessage, formatDate } from "@/lib/api-helpers";
 
@@ -80,7 +83,24 @@ export default function AdminOverviewPage() {
   const [recentNews, setRecentNews] = useState<RecentNews[]>([]);
   const [recentDownloads, setRecentDownloads] = useState<DownloadItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isResetting, setIsResetting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const handleResetStarterData = async () => {
+    if (!window.confirm("Are you sure you want to purge starter data? This will clear sample applications, inventory, and messages while preserving valid staff logins.")) {
+      return;
+    }
+    setIsResetting(true);
+    try {
+      await api.post("/admin/reset-starter-data");
+      toast.success("Starter data purged successfully! System accounts remain active.");
+      window.location.reload();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to reset starter data."));
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   useEffect(() => {
     const loadData = async () => {
@@ -210,25 +230,33 @@ export default function AdminOverviewPage() {
             Administrator Dashboard
           </h1>
           <p className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-            Manage public website content, institutional reports, announcements, and portal communication.
+            Manage public website content, uploaded student documents, announcements, and portal communication.
           </p>
         </div>
 
         {/* Quick Actions */}
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           <Link
-            href="/dashboard/administrator/news/add"
+            href="/dashboard/administrator/documents"
+            className="px-4 py-2.5 rounded-2xl border border-emerald-700/20 bg-emerald-50 dark:bg-emerald-950/50 hover:bg-emerald-100 text-emerald-800 dark:text-emerald-300 font-bold text-xs transition-all flex items-center gap-1.5"
+          >
+            <FolderOpen className="w-4 h-4 text-emerald-700" />
+            <span>View Uploaded Docs</span>
+          </Link>
+          <button
+            onClick={handleResetStarterData}
+            disabled={isResetting}
+            className="px-4 py-2.5 rounded-2xl border border-rose-200 dark:border-rose-900 bg-rose-50 dark:bg-rose-950/50 hover:bg-rose-100 text-rose-700 dark:text-rose-300 font-bold text-xs transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+          >
+            <RotateCcw className={`w-4 h-4 ${isResetting ? "animate-spin" : ""}`} />
+            <span>Clear Starter Data</span>
+          </button>
+          <Link
+            href="/dashboard/administrator/news?action=add"
             className="px-4 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-all shadow-md flex items-center gap-1.5"
           >
             <Plus className="w-4 h-4" />
             <span>Post News</span>
-          </Link>
-          <Link
-            href="/dashboard/administrator/gallery/add"
-            className="px-4 py-2.5 rounded-2xl border border-amber-900/15 dark:border-zinc-700 bg-amber-900/5 dark:bg-zinc-800 hover:bg-amber-900/10 text-zinc-800 dark:text-zinc-200 font-bold text-xs transition-all flex items-center gap-1.5"
-          >
-            <ImageIcon className="w-4 h-4 text-emerald-700" />
-            <span>Upload Media</span>
           </Link>
         </div>
       </div>

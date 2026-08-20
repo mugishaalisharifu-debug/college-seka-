@@ -1,7 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
+import toast from "react-hot-toast";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 import {
   UserCheck,
   UserX,
@@ -39,17 +42,82 @@ interface PrimaryApplication {
   };
 }
 
+interface BackendApplication {
+  id: string;
+  referenceCode: string;
+  studentFirstName: string;
+  studentLastName: string;
+  gender: string;
+  dateOfBirth: string;
+  educationLevel: string;
+  appliedClass: string;
+  parentName: string;
+  parentPhone: string;
+  parentEmail?: string | null;
+  residentialDescription: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+}
+
+function mapApplication(a: BackendApplication): PrimaryApplication {
+  const category = a.educationLevel === "NURSERY" ? "Nursery" : "Primary";
+  return {
+    id: a.id,
+    applicantName: `${a.studentFirstName} ${a.studentLastName}`.trim(),
+    category: category as PrimaryApplication["category"],
+    targetClass: a.appliedClass,
+    dateOfBirth: a.dateOfBirth ? String(a.dateOfBirth).slice(0, 10) : "",
+    gender: a.gender || "Male",
+    parentName: a.parentName,
+    parentPhone: a.parentPhone,
+    parentEmail: a.parentEmail || "",
+    address: a.residentialDescription,
+    appliedDate: a.createdAt ? String(a.createdAt).slice(0, 10) : "",
+    status: a.status === "APPROVED" ? "Approved" : a.status === "REJECTED" ? "Rejected" : "Pending",
+    documents: {
+      passportPhoto: "",
+      birthCertificate: "",
+      previousReport: "",
+    },
+  };
+}
+
 export default function PrimaryApplicationsReviewPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>("ALL");
   const [statusFilter, setStatusFilter] = useState<string>("ALL");
   const [searchTerm, setSearchTerm] = useState<string>("");
   const [selectedApp, setSelectedApp] = useState<PrimaryApplication | null>(null);
 
-  // Mock application database SCOPED ONLY to Nursery and Primary
+  // Application database SCOPED ONLY to Nursery and Primary
   const [applications, setApplications] = useState<PrimaryApplication[]>([]);
 
-  // Handle application status change (Approve/Reject)
-  const handleUpdateStatus = (id: string, newStatus: "Approved" | "Rejected") => {
+  useEffect(() => {
+    async function load() {
+      try {
+        const res = await api.get<BackendApplication[]>("/applications");
+        const primaryOnly = (res.data || []).filter(
+          (a) => a.educationLevel === "PRIMARY" || a.educationLevel === "NURSERY",
+        );
+        setApplications(primaryOnly.map(mapApplication));
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "Could not load applications."));
+      }
+    }
+    load();
+  }, []);
+
+  // Handle application status change (Approve/Reject) — persisted to backend.
+  const handleUpdateStatus = async (id: string, newStatus: "Approved" | "Rejected") => {
+    try {
+      await api.patch(`/applications/${id}/status`, {
+        status: newStatus === "Approved" ? "APPROVED" : "REJECTED",
+      });
+      toast.success(`Application ${newStatus.toLowerCase()}.`);
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, `Failed to ${newStatus.toLowerCase()} the application.`));
+      return;
+    }
+
     setApplications((prev) =>
       prev.map((app) => (app.id === id ? { ...app, status: newStatus } : app))
     );

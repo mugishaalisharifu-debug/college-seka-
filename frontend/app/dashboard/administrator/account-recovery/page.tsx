@@ -12,6 +12,10 @@ import {
   User,
   Mail,
   Loader2,
+  UserPlus,
+  Trash2,
+  Edit2,
+  X,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "@/lib/api";
@@ -23,27 +27,43 @@ export interface SystemStaffAccount {
   email: string;
   phone?: string;
   role: string;
+  scope?: string;
+  rawRole?: string;
   status: "Active" | "Locked" | "Suspended";
   lastPasswordChange?: string;
 }
 
 const ROLE_DISPLAY: Record<string, string> = {
   Admin: "Administrator",
-  "Primary-HeadMaster": "Headmaster",
-  "Secondary-HeadMaster": "Headmaster",
-  "DOS-Secondary": "Director of Studies (DOS)",
-  "DOS-Tvet": "Director of Studies (DOS)",
+  "Primary-HeadMaster": "Primary Headmaster",
+  "Secondary-HeadMaster": "Secondary Headmaster",
+  "DOS-Secondary": "Director of Studies (Secondary)",
+  "DOS-Tvet": "Director of Studies (TVET)",
   Bursar: "Bursar",
   Cashier: "Cashier",
   "School-receptionist": "School Receptionist",
   "Store-Manager": "Store Manager",
 };
 
-const ROLES_LIST = [
+const BACKEND_ROLES = [
+  { label: "Administrator", value: "Admin" },
+  { label: "Secondary Headmaster", value: "Secondary-HeadMaster" },
+  { label: "Primary Headmaster", value: "Primary-HeadMaster" },
+  { label: "DOS Secondary", value: "DOS-Secondary" },
+  { label: "DOS TVET", value: "DOS-Tvet" },
+  { label: "Bursar", value: "Bursar" },
+  { label: "Cashier", value: "Cashier" },
+  { label: "School Receptionist", value: "School-receptionist" },
+  { label: "Store Manager", value: "Store-Manager" },
+];
+
+const ROLES_FILTER_LIST = [
   "All Roles",
   "Administrator",
-  "Headmaster",
-  "Director of Studies (DOS)",
+  "Secondary Headmaster",
+  "Primary Headmaster",
+  "Director of Studies (Secondary)",
+  "Director of Studies (TVET)",
   "Bursar",
   "Cashier",
   "School Receptionist",
@@ -60,8 +80,32 @@ export default function AccountRecoveryPage() {
   // UI Action Loading States
   const [isResetting, setIsResetting] = useState(false);
   const [isUpdatingEmail, setIsUpdatingEmail] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [isCreating, setIsCreating] = useState(false);
 
-  // Form State
+  // Modal States
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+
+  // Create Form State
+  const [createForm, setCreateForm] = useState({
+    name: "",
+    email: "",
+    role: "DOS-Secondary",
+    scope: "All",
+    password: "admin12345",
+  });
+
+  // Edit Form State
+  const [editForm, setEditForm] = useState({
+    id: "",
+    name: "",
+    email: "",
+    role: "",
+    scope: "",
+  });
+
+  // Password Reset Form State
   const [newPassword, setNewPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [forcePasswordReset, setForcePasswordReset] = useState(true);
@@ -79,6 +123,8 @@ export default function AccountRecoveryPage() {
         name: acc.name,
         email: acc.email,
         role: ROLE_DISPLAY[acc.role] || acc.role,
+        rawRole: acc.role,
+        scope: acc.scope || "All",
         status: "Active",
       }));
       setAccounts(mapped);
@@ -103,12 +149,77 @@ export default function AccountRecoveryPage() {
   };
 
   const handleSelectStaff = (staff: SystemStaffAccount) => {
-    if (isResetting || isUpdatingEmail) return;
+    if (isResetting || isUpdatingEmail || isDeleting) return;
     setSelectedStaff(staff);
     setNewPassword("");
     setShowPassword(false);
     setUnlockAccount(staff.status === "Locked");
     setNewEmail(staff.email || "");
+  };
+
+  const handleCreateStaff = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!createForm.name || !createForm.email) {
+      toast.error("Name and Email are required.");
+      return;
+    }
+    setIsCreating(true);
+    try {
+      await api.post("/auth/staff-accounts", createForm);
+      toast.success(`Account created for ${createForm.name}!`);
+      setShowCreateModal(false);
+      setCreateForm({ name: "", email: "", role: "DOS-Secondary", scope: "All", password: "admin12345" });
+      loadAccounts();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to create account."));
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
+  const handleOpenEditModal = (staff: SystemStaffAccount) => {
+    setEditForm({
+      id: staff.id,
+      name: staff.name,
+      email: staff.email,
+      role: staff.rawRole || staff.role,
+      scope: staff.scope || "All",
+    });
+    setShowEditModal(true);
+  };
+
+  const handleUpdateStaffDetails = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      await api.patch(`/auth/staff-accounts/${editForm.id}`, {
+        name: editForm.name,
+        email: editForm.email,
+        role: editForm.role,
+        scope: editForm.scope,
+      });
+      toast.success("Staff account updated successfully!");
+      setShowEditModal(false);
+      loadAccounts();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to update account."));
+    }
+  };
+
+  const handleDeleteStaff = async (staff: SystemStaffAccount) => {
+    if (!window.confirm(`Are you sure you want to delete staff account ${staff.name} (${staff.email})?`)) {
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      await api.delete(`/auth/staff-accounts/${staff.id}`);
+      toast.success(`Account ${staff.email} deleted successfully.`);
+      if (selectedStaff?.id === staff.id) setSelectedStaff(null);
+      loadAccounts();
+    } catch (err) {
+      toast.error(getApiErrorMessage(err, "Failed to delete account."));
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   const handleSubmitReset = async (e: React.FormEvent) => {
@@ -212,17 +323,24 @@ export default function AccountRecoveryPage() {
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-                Security &amp; Access Management
+                System Administration &amp; Access Control
               </span>
-              <h1 className="font-serif text-2xl font-bold text-zinc-900 dark:text-white">
-                Staff Account Recovery &amp; Password Reset
+              <h1 className="font-sans text-2xl font-bold text-zinc-900 dark:text-white">
+                Staff User Accounts Management
               </h1>
+              <p className="text-xs text-zinc-500 mt-0.5">
+                Create, edit, reset credentials, and delete system user accounts across all roles.
+              </p>
             </div>
           </div>
 
-          <div className="rounded-xl bg-amber-50 px-3.5 py-2 text-xs font-semibold text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-900/50">
-            System Accounts Only (6 Roles)
-          </div>
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="px-4 py-2.5 rounded-2xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold text-xs transition-all shadow-md flex items-center gap-2 shrink-0 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Create New Staff User</span>
+          </button>
         </div>
       </div>
 
@@ -250,7 +368,7 @@ export default function AccountRecoveryPage() {
               onChange={(e) => setRoleFilter(e.target.value)}
               className="w-full sm:w-auto px-3 py-2 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-bold text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-2 focus:ring-emerald-700"
             >
-              {ROLES_LIST.map((role) => (
+              {ROLES_FILTER_LIST.map((role) => (
                 <option key={role} value={role}>
                   {role}
                 </option>
@@ -272,15 +390,14 @@ export default function AccountRecoveryPage() {
                 return (
                   <div
                     key={account.id}
-                    onClick={() => handleSelectStaff(account)}
-                    className={`p-4 rounded-2xl border transition-all cursor-pointer ${
+                    className={`p-4 rounded-2xl border transition-all ${
                       isSelected
                         ? "border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/20 dark:border-emerald-500 shadow-xs"
                         : "border-amber-900/10 bg-white hover:border-emerald-300 dark:border-zinc-800 dark:bg-zinc-900"
-                    } ${isResetting ? "opacity-50 pointer-events-none" : ""}`}
+                    }`}
                   >
                     <div className="flex items-center justify-between">
-                      <div className="flex items-start gap-3">
+                      <div className="flex items-start gap-3 cursor-pointer" onClick={() => handleSelectStaff(account)}>
                         <div className="rounded-xl bg-zinc-100 p-2.5 text-zinc-700 dark:bg-zinc-800 dark:text-zinc-300 shrink-0">
                           <User className="h-5 w-5" />
                         </div>
@@ -306,16 +423,27 @@ export default function AccountRecoveryPage() {
                           </p>
 
                           <p className="text-[11px] text-zinc-500 mt-1">
-                            {account.email} {account.phone ? `• ${account.phone}` : ""}
+                            {account.email} • Scope: {account.scope}
                           </p>
                         </div>
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-[10px] text-zinc-400 block">Status</span>
-                        <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
-                          Ready for Reset
-                        </span>
+                      {/* Action Buttons for Edit & Delete */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => handleOpenEditModal(account)}
+                          className="p-2 rounded-xl text-zinc-600 hover:bg-zinc-100 dark:hover:bg-zinc-800 hover:text-emerald-700 transition-colors cursor-pointer"
+                          title="Edit Account Details"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStaff(account)}
+                          className="p-2 rounded-xl text-zinc-600 hover:bg-rose-100 dark:hover:bg-rose-950/50 hover:text-rose-700 transition-colors cursor-pointer"
+                          title="Delete Account"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -331,13 +459,13 @@ export default function AccountRecoveryPage() {
           )}
         </div>
 
-        {/* Right Column: Password Reset Form (5 Cols) */}
+        {/* Right Column: Password Reset & Email Form (5 Cols) */}
         <div className="lg:col-span-5">
           <div className="sticky top-6 rounded-3xl border border-amber-900/10 bg-white p-6 shadow-xs dark:border-zinc-800 dark:bg-zinc-900 space-y-5">
             <div className="border-b border-amber-900/10 pb-4 dark:border-zinc-800">
               <h2 className="font-serif text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                 <ShieldAlert className="w-5 h-5 text-emerald-700" />
-                Reset Account Credentials
+                Reset Account Password
               </h2>
               <p className="text-xs text-zinc-500 mt-1">
                 Select a staff member from the left to update their password.
@@ -346,7 +474,6 @@ export default function AccountRecoveryPage() {
 
             {selectedStaff ? (
               <form onSubmit={handleSubmitReset} className="space-y-4 text-xs">
-                {/* Selected Staff Info Summary */}
                 <div className="bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 p-3.5 rounded-2xl space-y-1">
                   <div className="flex items-center justify-between">
                     <span className="font-bold text-zinc-900 dark:text-white">
@@ -364,7 +491,6 @@ export default function AccountRecoveryPage() {
                   </p>
                 </div>
 
-                {/* New Password Field */}
                 <div>
                   <div className="flex items-center justify-between mb-1.5">
                     <label className="font-bold text-zinc-700 dark:text-zinc-300">
@@ -401,34 +527,6 @@ export default function AccountRecoveryPage() {
                   </div>
                 </div>
 
-                {/* Additional Checkboxes */}
-                <div className="space-y-2 pt-2">
-                  <label className="flex items-center gap-2 cursor-pointer text-zinc-700 dark:text-zinc-300 font-medium">
-                    <input
-                      type="checkbox"
-                      disabled={isResetting}
-                      checked={forcePasswordReset}
-                      onChange={(e) => setForcePasswordReset(e.target.checked)}
-                      className="rounded border-zinc-300 text-emerald-700 focus:ring-emerald-600 disabled:opacity-50"
-                    />
-                    Require user to change password on next login
-                  </label>
-
-                  {selectedStaff.status === "Locked" && (
-                    <label className="flex items-center gap-2 cursor-pointer text-rose-700 dark:text-rose-400 font-bold">
-                      <input
-                        type="checkbox"
-                        disabled={isResetting}
-                        checked={unlockAccount}
-                        onChange={(e) => setUnlockAccount(e.target.checked)}
-                        className="rounded border-rose-300 text-emerald-700 focus:ring-emerald-600 disabled:opacity-50"
-                      />
-                      Unlock account status to Active
-                    </label>
-                  )}
-                </div>
-
-                {/* Form Actions */}
                 <div className="pt-3 border-t border-amber-900/10 dark:border-zinc-800 flex gap-2">
                   <button
                     type="submit"
@@ -461,57 +559,164 @@ export default function AccountRecoveryPage() {
               <div className="text-center py-10 text-zinc-400 space-y-2">
                 <UserCheck className="w-10 h-10 mx-auto text-zinc-300 dark:text-zinc-700" />
                 <p className="text-xs font-medium">
-                  No staff member selected. Click on any account from the left list to change credentials.
+                  Select an account from the left list to change credentials or update details.
                 </p>
               </div>
             )}
-
-            {/* Email Update Section */}
-            {selectedStaff && (
-              <form onSubmit={handleSubmitEmailUpdate} className="space-y-4 text-xs border-t border-amber-900/10 dark:border-zinc-800 pt-4">
-                <div className="flex items-center gap-2">
-                  <Mail className="w-4 h-4 text-emerald-700" />
-                  <h3 className="font-bold text-zinc-900 dark:text-white">Update Email Address</h3>
-                </div>
-
-                <div>
-                  <label className="mb-1 block font-bold text-zinc-700 dark:text-zinc-300">
-                    New Email Address *
-                  </label>
-                  <input
-                    type="email"
-                    required
-                    disabled={isUpdatingEmail || isResetting}
-                    value={newEmail}
-                    onChange={(e) => setNewEmail(e.target.value)}
-                    placeholder="user@example.com"
-                    className="w-full rounded-xl border border-zinc-200 px-3.5 py-2.5 font-medium text-zinc-900 focus:border-emerald-600 focus:outline-none dark:border-zinc-700 dark:bg-zinc-800 dark:text-white disabled:opacity-50"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={isUpdatingEmail || isResetting}
-                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-700 px-4 py-2.5 text-xs font-bold text-white hover:bg-emerald-800 transition-colors cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
-                >
-                  {isUpdatingEmail ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Updating Email...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Mail className="w-4 h-4" />
-                      <span>Update Email</span>
-                    </>
-                  )}
-                </button>
-              </form>
-            )}
           </div>
         </div>
-
       </div>
+
+      {/* CREATE STAFF USER MODAL */}
+      {showCreateModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-amber-900/10 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-900/10 dark:border-zinc-800 pb-3">
+              <h3 className="font-sans text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <UserPlus className="w-5 h-5 text-emerald-700" /> Create System User
+              </h3>
+              <button onClick={() => setShowCreateModal(false)} className="text-zinc-400 hover:text-zinc-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleCreateStaff} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Full Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={createForm.name}
+                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+                  placeholder="e.g. John Mugisha"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address *</label>
+                <input
+                  type="email"
+                  required
+                  value={createForm.email}
+                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+                  placeholder="john@college.com"
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">System Role *</label>
+                <select
+                  value={createForm.role}
+                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white cursor-pointer"
+                >
+                  {BACKEND_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Initial Password</label>
+                <input
+                  type="text"
+                  value={createForm.password}
+                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono text-zinc-900 dark:text-white"
+                />
+              </div>
+
+              <div className="pt-3 border-t border-amber-900/10 dark:border-zinc-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowCreateModal(false)}
+                  className="px-4 py-2 rounded-xl border border-zinc-200 text-zinc-600 hover:bg-zinc-100 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isCreating}
+                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
+                >
+                  {isCreating ? "Creating..." : "Create Account"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT STAFF USER MODAL */}
+      {showEditModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-amber-900/10 dark:border-zinc-800 rounded-3xl p-6 max-w-md w-full shadow-2xl space-y-4">
+            <div className="flex items-center justify-between border-b border-amber-900/10 dark:border-zinc-800 pb-3">
+              <h3 className="font-sans text-lg font-bold text-zinc-900 dark:text-white flex items-center gap-2">
+                <Edit2 className="w-5 h-5 text-emerald-700" /> Edit Staff User Details
+              </h3>
+              <button onClick={() => setShowEditModal(false)} className="text-zinc-400 hover:text-zinc-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateStaffDetails} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={editForm.name}
+                  onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={editForm.email}
+                  onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-zinc-700 dark:text-zinc-300 mb-1">Role</label>
+                <select
+                  value={editForm.role}
+                  onChange={(e) => setEditForm({ ...editForm, role: e.target.value })}
+                  className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-zinc-900 dark:text-white cursor-pointer"
+                >
+                  {BACKEND_ROLES.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="pt-3 border-t border-amber-900/10 dark:border-zinc-800 flex justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowEditModal(false)}
+                  className="px-4 py-2 rounded-xl border border-zinc-200 text-zinc-600 hover:bg-zinc-100 font-bold"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white font-bold"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

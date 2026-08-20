@@ -1,4 +1,9 @@
-import { Injectable, Inject, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Inject,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import * as schema from '../db/schema';
 import { DRIZZLE } from '../db/db.provider';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
@@ -6,9 +11,7 @@ import { eq, desc } from 'drizzle-orm';
 
 @Injectable()
 export class InventoryService {
-  constructor(
-    @Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>
-  ) {}
+  constructor(@Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>) {}
 
   async getAllItems() {
     return await this.db
@@ -17,14 +20,20 @@ export class InventoryService {
       .orderBy(schema.inventoryItems.name);
   }
 
-  async createItem(dto: { name: string; category: string; unit: 'kg' | 'liters' | 'bags' }) {
+  async createItem(dto: {
+    name: string;
+    category: string;
+    unit: 'kg' | 'liters' | 'bags';
+  }) {
     const existing = await this.db
       .select()
       .from(schema.inventoryItems)
       .where(eq(schema.inventoryItems.name, dto.name));
 
     if (existing.length > 0) {
-      throw new BadRequestException('A food item with this name already exists.');
+      throw new BadRequestException(
+        'A food item with this name already exists.',
+      );
     }
 
     const [newItem] = await this.db
@@ -42,7 +51,7 @@ export class InventoryService {
 
   async updateItem(
     id: string,
-    dto: { name?: string; category?: string; unit?: 'kg' | 'liters' | 'bags' }
+    dto: { name?: string; category?: string; unit?: 'kg' | 'liters' | 'bags' },
   ) {
     const [existing] = await this.db
       .select()
@@ -60,7 +69,9 @@ export class InventoryService {
         .where(eq(schema.inventoryItems.name, dto.name));
 
       if (dup) {
-        throw new BadRequestException('A food item with this name already exists.');
+        throw new BadRequestException(
+          'A food item with this name already exists.',
+        );
       }
     }
 
@@ -107,7 +118,7 @@ export class InventoryService {
       dateReceived: string;
       notes?: string;
     },
-    cashierId: string
+    cashierId: string,
   ) {
     if (dto.quantity <= 0) {
       throw new BadRequestException('Quantity must be greater than zero.');
@@ -160,10 +171,12 @@ export class InventoryService {
       timeIssued?: string;
       notes?: string;
     },
-    cashierId: string
+    cashierId: string,
   ) {
     if (dto.quantity <= 0) {
-      throw new BadRequestException('Quantity released must be greater than zero.');
+      throw new BadRequestException(
+        'Quantity released must be greater than zero.',
+      );
     }
 
     const [item] = await this.db
@@ -178,7 +191,7 @@ export class InventoryService {
     const currentAvailable = Number(item.availableQuantity);
     if (dto.quantity > currentAvailable) {
       throw new BadRequestException(
-        `Insufficient stock! Only ${currentAvailable} ${item.unit} of ${item.name} available in store.`
+        `Insufficient stock! Only ${currentAvailable} ${item.unit} of ${item.name} available in store.`,
       );
     }
 
@@ -244,7 +257,7 @@ export class InventoryService {
       .from(schema.inventoryTransactions)
       .innerJoin(
         schema.inventoryItems,
-        eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id)
+        eq(schema.inventoryTransactions.itemId, schema.inventoryItems.id),
       )
       .orderBy(desc(schema.inventoryTransactions.createdAt));
 
@@ -254,7 +267,7 @@ export class InventoryService {
 
     return await query;
   }
-  
+
   async recordSpoilage(
     dto: {
       itemId: string;
@@ -269,10 +282,12 @@ export class InventoryService {
       timeReported?: string;
       notes?: string;
     },
-    cashierId: string
+    cashierId: string,
   ) {
     if (dto.quantity <= 0) {
-      throw new BadRequestException('Spoiled quantity must be greater than zero.');
+      throw new BadRequestException(
+        'Spoiled quantity must be greater than zero.',
+      );
     }
 
     const [item] = await this.db
@@ -287,7 +302,7 @@ export class InventoryService {
     const currentAvailable = Number(item.availableQuantity);
     if (dto.quantity > currentAvailable) {
       throw new BadRequestException(
-        `Invalid quantity! Cannot log ${dto.quantity} ${item.unit} as spoiled because only ${currentAvailable} ${item.unit} are available.`
+        `Invalid quantity! Cannot log ${dto.quantity} ${item.unit} as spoiled because only ${currentAvailable} ${item.unit} are available.`,
       );
     }
 
@@ -359,7 +374,7 @@ export class InventoryService {
     } else {
       if (newQtyRaw > balance) {
         throw new BadRequestException(
-          `Insufficient stock! Only ${balance} ${item.unit} of ${item.name} available.`
+          `Insufficient stock! Only ${balance} ${item.unit} of ${item.name} available.`,
         );
       }
       balance -= newQtyRaw;
@@ -371,7 +386,8 @@ export class InventoryService {
       .where(eq(schema.inventoryItems.id, item.id));
 
     const updatePayload: Record<string, any> = {};
-    if (dto.quantity !== undefined) updatePayload.quantity = newQtyRaw.toString();
+    if (dto.quantity !== undefined)
+      updatePayload.quantity = newQtyRaw.toString();
     if (dto.supplier !== undefined) updatePayload.supplier = dto.supplier;
     if (dto.invoiceNumber !== undefined)
       updatePayload.invoiceNumber = dto.invoiceNumber;
@@ -387,7 +403,10 @@ export class InventoryService {
       .where(eq(schema.inventoryTransactions.id, id))
       .returning();
 
-    return { message: 'Transaction updated successfully', transaction: updated };
+    return {
+      message: 'Transaction updated successfully',
+      transaction: updated,
+    };
   }
 
   async deleteTransaction(id: string) {

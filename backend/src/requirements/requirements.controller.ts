@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
@@ -18,7 +19,7 @@ import { Roles } from 'common/decorators/role.decorator';
 
 @UseGuards(JwtGuard, RoleGuard)
 @Controller('requirements')
-@Roles('School-receptionist')
+@Roles('School-receptionist', 'Store-Manager', 'Admin')
 export class RequirementsController {
   constructor(private readonly requirementsService: RequirementsService) {}
 
@@ -38,14 +39,20 @@ export class RequirementsController {
     @Body()
     dto: {
       name: string;
-      category: 'Boarding / Tools' | 'Academic Supplies' | 'Personal Care / Fees';
+      category:
+        'Boarding / Tools' | 'Academic Supplies' | 'Personal Care / Fees';
       scope?: any;
       classId?: string;
       academicYear: string;
       description?: string;
-    }
+    },
   ) {
     return await this.requirementsService.createMasterItem(dto);
+  }
+
+  @Patch('master/:id')
+  async updateMasterItem(@Param('id') id: string, @Body() dto: any) {
+    return await this.requirementsService.updateMasterItem(id, dto);
   }
 
   @Delete('master/:id')
@@ -68,7 +75,7 @@ export class RequirementsController {
       academicYear: string;
       term: 'TERM_1' | 'TERM_2' | 'TERM_3';
     },
-    @Req() req: any
+    @Req() req: any,
   ) {
     const inspectorId = req.user?.id;
     if (!inspectorId) {
@@ -77,7 +84,7 @@ export class RequirementsController {
     return await this.requirementsService.saveStudentClearance(
       studentId,
       dto,
-      inspectorId
+      inspectorId,
     );
   }
 
@@ -95,7 +102,7 @@ export class RequirementsController {
       issuedTo: string;
       notes?: string;
     },
-    @Req() req: any
+    @Req() req: any,
   ) {
     const recordedBy = req.user?.id;
     if (!recordedBy) {

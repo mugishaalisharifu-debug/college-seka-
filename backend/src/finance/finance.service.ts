@@ -12,9 +12,7 @@ import { randomBytes } from 'crypto';
 
 @Injectable()
 export class FinanceService {
-  constructor(
-    @Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>
-  ) {}
+  constructor(@Inject(DRIZZLE) private db: NodePgDatabase<typeof schema>) {}
 
   private getTermOrder(term: 'TERM_1' | 'TERM_2' | 'TERM_3'): number {
     switch (term) {
@@ -77,7 +75,7 @@ export class FinanceService {
           isDayOnly: fee.isDayOnly ?? false,
           isNewStudentOnly: fee.isNewStudentOnly ?? false,
           customReason: fee.customReason || null,
-        }))
+        })),
       )
       .returning();
 
@@ -90,13 +88,14 @@ export class FinanceService {
   async getAllFeeStructures(
     academicYear?: string,
     term?: 'TERM_1' | 'TERM_2' | 'TERM_3',
-    scope?: 'PRIMARY' | 'LOWER SECONDARY' | 'TVET' | 'NURSERY' | 'All'
+    scope?: 'PRIMARY' | 'LOWER SECONDARY' | 'TVET' | 'NURSERY' | 'All',
   ) {
     const query = this.db.select().from(schema.feeStructures);
 
     const conditions: SQL[] = [];
 
-    if (academicYear) conditions.push(eq(schema.feeStructures.academicYear, academicYear));
+    if (academicYear)
+      conditions.push(eq(schema.feeStructures.academicYear, academicYear));
     if (term) conditions.push(eq(schema.feeStructures.term, term));
     if (scope) conditions.push(eq(schema.feeStructures.scope, scope));
 
@@ -125,17 +124,24 @@ export class FinanceService {
 
     const updatePayload: Record<string, any> = {};
 
-    if (data.academicYear !== undefined) updatePayload.academicYear = data.academicYear;
+    if (data.academicYear !== undefined)
+      updatePayload.academicYear = data.academicYear;
     if (data.term !== undefined) updatePayload.term = data.term;
     if (data.scope !== undefined) updatePayload.scope = data.scope;
-    if (data.tradeName !== undefined) updatePayload.tradeName = data.tradeName || null;
+    if (data.tradeName !== undefined)
+      updatePayload.tradeName = data.tradeName || null;
     if (data.name !== undefined) updatePayload.name = data.name;
-    if (data.amount !== undefined) updatePayload.amount = data.amount.toString();
-    if (data.isMandatory !== undefined) updatePayload.isMandatory = data.isMandatory;
-    if (data.isBoardingOnly !== undefined) updatePayload.isBoardingOnly = data.isBoardingOnly;
+    if (data.amount !== undefined)
+      updatePayload.amount = data.amount.toString();
+    if (data.isMandatory !== undefined)
+      updatePayload.isMandatory = data.isMandatory;
+    if (data.isBoardingOnly !== undefined)
+      updatePayload.isBoardingOnly = data.isBoardingOnly;
     if (data.isDayOnly !== undefined) updatePayload.isDayOnly = data.isDayOnly;
-    if (data.isNewStudentOnly !== undefined) updatePayload.isNewStudentOnly = data.isNewStudentOnly;
-    if (data.customReason !== undefined) updatePayload.customReason = data.customReason || null;
+    if (data.isNewStudentOnly !== undefined)
+      updatePayload.isNewStudentOnly = data.isNewStudentOnly;
+    if (data.customReason !== undefined)
+      updatePayload.customReason = data.customReason || null;
 
     const [updatedFee] = await this.db
       .update(schema.feeStructures)
@@ -168,7 +174,7 @@ export class FinanceService {
   async getStudentLedger(
     studentId: string,
     currentAcademicYear?: string,
-    currentTerm?: 'TERM_1' | 'TERM_2' | 'TERM_3'
+    currentTerm?: 'TERM_1' | 'TERM_2' | 'TERM_3',
   ) {
     const [studentData] = await this.db
       .select({
@@ -185,9 +191,7 @@ export class FinanceService {
 
     const { student, className } = studentData;
 
-    const allFeeStructures = await this.db
-      .select()
-      .from(schema.feeStructures);
+    const allFeeStructures = await this.db.select().from(schema.feeStructures);
 
     const targetTermOrder = currentTerm ? this.getTermOrder(currentTerm) : 3;
 
@@ -233,21 +237,23 @@ export class FinanceService {
       return true;
     });
 
-    const currentTermFees = (currentAcademicYear && currentTerm)
-      ? historicalApplicableFees.filter(
-          (fee) =>
-            fee.academicYear === currentAcademicYear && fee.term === currentTerm
-        )
-      : historicalApplicableFees;
+    const currentTermFees =
+      currentAcademicYear && currentTerm
+        ? historicalApplicableFees.filter(
+            (fee) =>
+              fee.academicYear === currentAcademicYear &&
+              fee.term === currentTerm,
+          )
+        : historicalApplicableFees;
 
     const currentTermFeeTotal = currentTermFees.reduce(
       (sum, item) => sum + Number(item.amount),
-      0
+      0,
     );
 
     const totalCumulativeFees = historicalApplicableFees.reduce(
       (sum, item) => sum + Number(item.amount),
-      0
+      0,
     );
 
     const paymentHistory = await this.db
@@ -257,10 +263,13 @@ export class FinanceService {
 
     const totalPaidHistorical = paymentHistory.reduce(
       (sum, p) => sum + Number(p.amountPaid),
-      0
+      0,
     );
 
-    const netOutstandingDebt = Math.max(0, totalCumulativeFees - totalPaidHistorical);
+    const netOutstandingDebt = Math.max(
+      0,
+      totalCumulativeFees - totalPaidHistorical,
+    );
 
     return {
       student: {
@@ -288,7 +297,7 @@ export class FinanceService {
 
   async getAllDebtors(
     academicYear?: string,
-    term?: 'TERM_1' | 'TERM_2' | 'TERM_3'
+    term?: 'TERM_1' | 'TERM_2' | 'TERM_3',
   ) {
     const activeStudents = await this.db
       .select({
@@ -306,7 +315,7 @@ export class FinanceService {
       const ledger = await this.getStudentLedger(
         student.id,
         academicYear,
-        term
+        term,
       );
 
       if (ledger.summary.netOutstandingDebt > 0) {
@@ -342,12 +351,14 @@ export class FinanceService {
       academicPeriod: string;
       remarks?: string;
     },
-    bursarId: string
+    bursarId: string,
   ) {
     const { studentId, amountPaid, academicPeriod, remarks } = paymentData;
 
     if (amountPaid <= 0) {
-      throw new BadRequestException('Payment amount must be greater than zero.');
+      throw new BadRequestException(
+        'Payment amount must be greater than zero.',
+      );
     }
 
     const [student] = await this.db
@@ -396,7 +407,7 @@ export class FinanceService {
   async getAllPayments(
     studentId?: string,
     academicPeriod?: string,
-    recordedBy?: string
+    recordedBy?: string,
   ) {
     const conditions: SQL[] = [];
 
@@ -424,7 +435,9 @@ export class FinanceService {
 
     if (paymentData.amountPaid !== undefined) {
       if (Number(paymentData.amountPaid) <= 0) {
-        throw new BadRequestException('Payment amount must be greater than zero.');
+        throw new BadRequestException(
+          'Payment amount must be greater than zero.',
+        );
       }
       updatePayload.amountPaid = paymentData.amountPaid.toString();
     }
@@ -452,9 +465,7 @@ export class FinanceService {
   async deletePayment(id: string) {
     await this.getPaymentById(id);
 
-    await this.db
-      .delete(schema.payments)
-      .where(eq(schema.payments.id, id));
+    await this.db.delete(schema.payments).where(eq(schema.payments.id, id));
 
     return {
       message: 'Payment record deleted successfully.',

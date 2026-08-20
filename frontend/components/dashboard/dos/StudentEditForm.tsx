@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   Edit,
   ArrowLeft,
@@ -9,66 +9,189 @@ import {
   Phone,
   CheckCircle2,
   Save,
+  Loader2,
+  AlertCircle,
 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { AcademicScope, EducationCategory, getScopeConfig } from "@/lib/role-scope";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 
-interface ClassOption {
+// Backend class row (as returned by GET /dos/classes).
+interface BackendClass {
   id: string;
-  category: EducationCategory;
-  levelName: string;
-  streamName: string;
+  className: string;
+  scope: string;
+  tradeName?: string | null;
 }
 
-/** Active class seats of a scope: every managed level combined with its streams or trades. */
-function buildClassOptions(scope: AcademicScope): ClassOption[] {
-  const config = getScopeConfig(scope);
-  return config.categories.flatMap((category) =>
-    config.classes.flatMap((levelName) =>
-      config.streams.map((streamName) => ({
-        id: `CLS-${levelName}-${streamName}`.replace(/[^a-zA-Z0-9]+/g, "-").toUpperCase(),
-        category,
-        levelName,
-        streamName,
-      }))
-    )
-  );
+// Backend student row (as returned by GET /dos/students).
+interface BackendStudent {
+  id: string;
+  studentName: string;
+  gender: "Male" | "Female" | null;
+  dateOfBirth?: string | null;
+  educationLevel: string;
+  tradeName?: string | null;
+  classId?: string | null;
+  parentName: string;
+  parentPhone: string;
+  studentType?: string;
+  status?: string;
+}
+
+function backendLevelToCategory(level: string): EducationCategory {
+  switch (level) {
+    case "NURSERY":
+      return "Nursery";
+    case "PRIMARY":
+      return "Primary";
+    case "LOWER SECONDARY":
+      return "Lower Secondary";
+    case "TVET":
+      return "TVET";
+    default:
+      return "Primary";
+  }
+}
+
+function uiCategoryToLevel(category: EducationCategory): string {
+  switch (category) {
+    case "Nursery":
+      return "NURSERY";
+    case "Primary":
+      return "PRIMARY";
+    case "Lower Secondary":
+      return "LOWER SECONDARY";
+    case "TVET":
+      return "TVET";
+    default:
+      return "PRIMARY";
+  }
+}
+
+function uiStatusToBackend(status: "Active" | "Suspended" | "Discontinued"): string {
+  switch (status) {
+    case "Suspended":
+      return "SUSPENDED";
+    case "Discontinued":
+      return "TRANSFERRED";
+    default:
+      return "ACTIVE";
+  }
 }
 
 export default function StudentEditForm({ scope }: { scope: AcademicScope }) {
   const config = getScopeConfig(scope);
-  const availableClasses = buildClassOptions(scope);
   const params = useParams();
   const router = useRouter();
-  const studentId = (params?.id as string) || "STU-2026-001";
+  const studentId = (params?.id as string) || "";
 
-  // Pre-populated Form State (Simulates fetched student record)
-  const [firstName, setFirstName] = useState("Jean Paul");
-  const [lastName, setLastName] = useState("Nshimiyimana");
+  // Live class options loaded from the database.
+  const [availableClasses, setAvailableClasses] = useState<BackendClass[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Real student record (dynamic, from the database).
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
   const [gender, setGender] = useState<"Male" | "Female">("Male");
+  const [dob, setDob] = useState("");
   const [category, setCategory] = useState<EducationCategory>(config.categories[0]);
-  const [selectedClassId, setSelectedClassId] = useState(availableClasses[0].id);
-  const [guardianName, setGuardianName] = useState("Pierre Mugisha");
-  const [guardianPhone, setGuardianPhone] = useState("0788123456");
+  const [selectedClassId, setSelectedClassId] = useState("");
+  const [guardianName, setGuardianName] = useState("");
+  const [guardianPhone, setGuardianPhone] = useState("");
   const [status, setStatus] = useState<"Active" | "Suspended" | "Discontinued">("Active");
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMessage, setSuccessMessage] = useState(false);
 
-  const filteredClasses = availableClasses.filter((c) => c.category === category);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      try {
+        const [classesRes, studentRes] = await Promise.all([
+          api.get<BackendClass[]>("/dos/classes"),
+          // The DOS scope listing is role-scoped; we still find this student in it.
+          api.get<BackendStudent[]>("/dos/students"),
+        ]);
+        if (cancelled) return;
 
-  const handleSubmit = (e: React.FormEvent) => {
+        setAvailableClasses(classesRes.data || []);
+
+        const stu = (studentRes.data || []).find((s) => s.id === studentId);
+        if (!stu) {
+          setLoadError("Student not found in the database.");
+          setIsLoading(false);
+          return;
+        }
+
+        const nameParts = (stu.studentName || "").split(/\s+/);
+        setFirstName(nameParts[0] || "");
+        setLastName(nameParts.slice(1).join(" ") || "");
+        setGender((stu.gender as "Male" | "Female") || "Male");
+        setDob(stu.dateOfBirth ? new Date(stu.dateOfBirth).toISOString().slice(0, 10) : "");
+        setCategory(backendLevelToCategory(stu.educationLevel));
+        setSelectedClassId(stu.classId || "");
+        setGuardianName(stu.parentName || "");
+        setGuardianPhone(stu.parentPhone || "");
+        setStatus(
+          stu.status === "SUSPENDED"
+            ? "Suspended"
+            : stu.status === "TRANSFERRED" || stu.status === "GRADUATED"
+              ? "Discontinued"
+              : "Active",
+        );
+      } catch (error) {
+        if (!cancelled) {
+          setLoadError(getApiErrorMessage(error, "Could not load the student record."));
+        }
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [studentId, scope]);
+
+  const filteredClasses = availableClasses.filter(
+    (c) => c.scope === uiCategoryToLevel(category),
+  );
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    setTimeout(() => {
+    const payload = {
+      studentName: `${firstName.trim()} ${lastName.trim()}`.trim(),
+      gender,
+      dateOfBirth: dob ? new Date(dob).toISOString() : new Date().toISOString(),
+      educationLevel: uiCategoryToLevel(category),
+      tradeName: category === "TVET" ? (filteredClasses.find((c) => c.id === selectedClassId)?.className ?? null) : null,
+      classId: selectedClassId || null,
+      parentName: guardianName.trim(),
+      parentPhone: guardianPhone.trim(),
+      studentType:
+        category === "Lower Secondary" || category === "TVET" ? "BOARDING" : "DAY",
+      status: uiStatusToBackend(status),
+    };
+
+    try {
+      await api.patch(`/dos/students/${studentId}`, payload);
       setIsSubmitting(false);
       setSuccessMessage(true);
       setTimeout(() => {
         router.push(`${config.basePath}/students`);
+        router.refresh();
       }, 1200);
-    }, 800);
+    } catch (err) {
+      setIsSubmitting(false);
+      setLoadError(getApiErrorMessage(err, "Failed to update the student record."));
+    }
   };
 
   return (
@@ -94,6 +217,35 @@ export default function StudentEditForm({ scope }: { scope: AcademicScope }) {
         <div className="p-4 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 flex items-center gap-2 text-emerald-800 dark:text-emerald-200 text-xs font-semibold">
           <CheckCircle2 className="w-5 h-5 text-emerald-600" />
           <span>Student profile updated successfully! Redirecting...</span>
+        </div>
+      )}
+
+      {loadError && (
+        <div className="p-4 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-900 flex items-start gap-2 text-rose-800 dark:text-rose-300 text-xs font-semibold">
+          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+          <div className="space-y-2">
+            <span>{loadError}</span>
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setLoadError(null);
+                  setIsLoading(true);
+                  window.location.reload();
+                }}
+                className="px-3 py-1.5 rounded-lg bg-rose-700 hover:bg-rose-800 text-white font-bold text-[11px] transition-colors cursor-pointer"
+              >
+                Retry
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isLoading && (
+        <div className="p-6 rounded-3xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 flex items-center justify-center gap-3 text-xs font-bold text-zinc-500">
+          <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
+          Loading student record from the database...
         </div>
       )}
 
@@ -139,11 +291,17 @@ export default function StudentEditForm({ scope }: { scope: AcademicScope }) {
                 className="w-full px-3.5 py-2.5 rounded-xl border border-amber-900/15 dark:border-zinc-700 bg-white dark:bg-zinc-800 font-medium"
               >
                 <option value="">-- Select Stream --</option>
-                {filteredClasses.map((cls) => (
-                  <option key={cls.id} value={cls.id}>
-                    {`${cls.levelName} — ${cls.streamName}`}
+                {filteredClasses.length > 0 ? (
+                  filteredClasses.map((cls) => (
+                    <option key={cls.id} value={cls.id}>
+                      {cls.className}
+                    </option>
+                  ))
+                ) : (
+                  <option value="" disabled>
+                    No classes available for this level — create one in Class Management first
                   </option>
-                ))}
+                )}
               </select>
             </div>
 

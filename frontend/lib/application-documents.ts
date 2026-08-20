@@ -42,12 +42,13 @@ export const CLASS_LEVEL_OPTIONS: ClassLevelOption[] = [
 ];
 
 export const TVET_TRADES: string[] = [
-  "Software Development",
+  "Accounting",
   "Agriculture",
   "Food Processing",
   "Mechanics",
   "Tailoring",
   "Culinary Arts",
+  "Not Available",
 ];
 
 const PASSPORT_PHOTO: RequiredDocument = {

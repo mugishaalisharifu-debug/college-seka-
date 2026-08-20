@@ -1,6 +1,9 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 import {
   Search,
   CheckCircle2,
@@ -15,7 +18,6 @@ import {
   Wrench,
   Filter,
 } from "lucide-react";
-import { downloadTextFile } from "@/lib/file-export";
 import ReportViewerModal, { ReportData } from "@/components/dashboard/ReportViewerModal";
 import { AcademicScope, EducationCategory, getScopeConfig } from "@/lib/role-scope";
 
@@ -46,45 +48,92 @@ interface Application {
   documentsUploaded: string[];
 }
 
-const SCHOOL_CLASSES: ClassStream[] = [
-  // Primary
-  { id: "CLS-P5A", category: "Primary", levelName: "Primary 5", streamName: "P5A", enrolled: 44, capacity: 45 },
-  { id: "CLS-P5B", category: "Primary", levelName: "Primary 5", streamName: "P5B", enrolled: 45, capacity: 45 },
-  { id: "CLS-P5C", category: "Primary", levelName: "Primary 5", streamName: "P5C", enrolled: 28, capacity: 45 },
-  
-  // Lower Secondary
-  { id: "CLS-S1A", category: "Lower Secondary", levelName: "Senior 1", streamName: "S1A", enrolled: 48, capacity: 50 },
-  { id: "CLS-S1B", category: "Lower Secondary", levelName: "Senior 1", streamName: "S1B", enrolled: 50, capacity: 50 },
-  { id: "CLS-S2A", category: "Lower Secondary", levelName: "Senior 2", streamName: "S2A", enrolled: 45, capacity: 50 },
-  { id: "CLS-S3A", category: "Lower Secondary", levelName: "Senior 3", streamName: "S3A", enrolled: 52, capacity: 52 },
-
-  // TVET - Faculty: Agriculture
-  { id: "CLS-L4-AGRI-A", category: "TVET", tradeName: "Agriculture", levelName: "Level 4 (L4)", streamName: "L4 Agriculture - Stream A", enrolled: 25, capacity: 30 },
-  { id: "CLS-L4-AGRI-B", category: "TVET", tradeName: "Agriculture", levelName: "Level 4 (L4)", streamName: "L4 Agriculture - Stream B", enrolled: 30, capacity: 30 },
-  
-  // TVET - Faculty: Mechanics
-  { id: "CLS-L3-MECH", category: "TVET", tradeName: "Mechanics", levelName: "Level 3 (L3)", streamName: "L3 Mechanics - Main", enrolled: 18, capacity: 25 },
-  
-  // TVET - Faculty: Software Development
-  { id: "CLS-L3-SD", category: "TVET", tradeName: "Software Development", levelName: "Level 3 (L3)", streamName: "L3 SD - Stream A", enrolled: 32, capacity: 35 },
-];
-
-
-
 const ALL_CATEGORIES_OPTION = "All Trades & Categories";
+
+// Backend `education_level` → local UI category.
+function levelToCategory(level: string): AcademicCategory {
+  switch (level) {
+    case "NURSERY":
+      return "Nursery";
+    case "PRIMARY":
+      return "Primary";
+    case "LOWER SECONDARY":
+      return "Lower Secondary";
+    case "TVET":
+      return "TVET";
+    default:
+      return "Primary";
+  }
+}
+
+interface BackendApplication {
+  id: string;
+  referenceCode: string;
+  studentFirstName: string;
+  studentLastName: string;
+  educationLevel: string;
+  tradeName?: string | null;
+  appliedClass: string;
+  parentName: string;
+  parentPhone: string;
+  status: "PENDING" | "APPROVED" | "REJECTED";
+  createdAt: string;
+}
+
+interface BackendClass {
+  id: string;
+  className: string;
+  scope?: string | null;
+  tradeName?: string | null;
+}
+
+interface BackendDocument {
+  id: string;
+  documentType: string;
+  fileUrl: string;
+  fileName: string;
+}
+
+// Backend class rows → local ClassStream shape, deriving streamName from the class name.
+function mapBackendClasses(rows: BackendClass[]): ClassStream[] {
+  return (rows || []).map((c) => ({
+    id: c.id,
+    category: levelToCategory(c.scope || "PRIMARY"),
+    tradeName: c.tradeName || undefined,
+    levelName: c.className,
+    streamName: c.className,
+    enrolled: 0,
+    capacity: 40,
+  }));
+}
+
+// Backend application rows → local UI shape.
+function mapApplications(rows: BackendApplication[]): Application[] {
+  return (rows || []).map((a) => ({
+    id: a.id,
+    applicantName: `${a.studentFirstName} ${a.studentLastName}`.trim(),
+    parentName: a.parentName,
+    parentPhone: a.parentPhone,
+    appliedCategory: levelToCategory(a.educationLevel),
+    appliedTrade: a.tradeName || undefined,
+    appliedLevel: a.appliedClass,
+    submissionDate: new Date(a.createdAt).toLocaleDateString("en-US", {
+      month: "short",
+      day: "2-digit",
+      year: "numeric",
+    }),
+    status: a.status === "APPROVED" ? "Approved" : a.status === "REJECTED" ? "Rejected" : "Pending",
+    assignedClass: a.appliedClass,
+    documentsUploaded: [],
+  }));
+}
 
 export default function ApplicationsReview({ scope }: { scope: AcademicScope }) {
   const config = getScopeConfig(scope);
   const supportsTrades = scope === "tvet";
-  const scopedTrades = Array.from(
-    new Set(
-      SCHOOL_CLASSES.filter((c) => config.categories.includes(c.category))
-        .map((c) => c.tradeName)
-        .filter((t): t is string => Boolean(t))
-    )
-  );
-  const filterOptions = [ALL_CATEGORIES_OPTION, ...scopedTrades, ...config.categories];
 
+  // Classes loaded live from /dos/classes (dynamic, managed by DOS dashboards).
+  const [availableClasses, setAvailableClasses] = useState<ClassStream[]>([]);
   const [applications, setApplications] = useState<Application[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<string>("All");
@@ -95,6 +144,32 @@ export default function ApplicationsReview({ scope }: { scope: AcademicScope }) 
   const [selectedTrade, setSelectedTrade] = useState<string>("");
   const [selectedClassId, setSelectedClassId] = useState<string>("");
   const [activeReport, setActiveReport] = useState<ReportData | null>(null);
+
+  const scopedTrades = Array.from(
+    new Set(
+      availableClasses
+        .filter((c) => config.categories.includes(c.category))
+        .map((c) => c.tradeName)
+        .filter((t): t is string => Boolean(t))
+    )
+  );
+  const filterOptions = [ALL_CATEGORIES_OPTION, ...scopedTrades, ...config.categories];
+
+  useEffect(() => {
+    async function load() {
+      try {
+        const [classesRes, appRes] = await Promise.all([
+          api.get<BackendClass[]>("/dos/classes"),
+          api.get<BackendApplication[]>("/applications"),
+        ]);
+        setAvailableClasses(mapBackendClasses(classesRes.data));
+        setApplications(mapApplications(appRes.data));
+      } catch (error) {
+        toast.error(getApiErrorMessage(error, "Could not load applications."));
+      }
+    }
+    load();
+  }, []);
 
   const handleOpenApplicationsReport = () => {
     setActiveReport({
@@ -133,8 +208,19 @@ export default function ApplicationsReview({ scope }: { scope: AcademicScope }) 
     return matchesSearch && matchesStatus && matchesTrade;
   });
 
-  const handleOpenReviewModal = (app: Application) => {
-    setActiveModalApp(app);
+  const handleOpenReviewModal = async (app: Application) => {
+    // Preload the actual uploaded documents for this application.
+    let liveDocs: string[] = [];
+    try {
+      const res = await api.get<BackendApplication & { documents?: BackendDocument[] }>(
+        `/applications/${app.id}`,
+      );
+      liveDocs = (res.data.documents || []).map((d) => d.fileUrl);
+    } catch {
+      // Fall back to whatever the row already holds.
+    }
+
+    setActiveModalApp({ ...app, documentsUploaded: liveDocs });
     setSelectedClassId("");
     if (supportsTrades && app.appliedTrade) {
       setSelectedTrade(app.appliedTrade);
@@ -143,10 +229,20 @@ export default function ApplicationsReview({ scope }: { scope: AcademicScope }) 
     }
   };
 
-  const handleApproveAndAssign = () => {
-    if (!activeModalApp || !selectedClassId) return;
+  const handleApproveAndAssign = async () => {
+    if (!activeModalApp || !activeModalApp.id) return;
 
-    const chosenClass = SCHOOL_CLASSES.find((c) => c.id === selectedClassId);
+    const chosenClass = availableClasses.find((c) => c.id === selectedClassId);
+
+    try {
+      await api.patch(`/applications/${activeModalApp.id}/status`, {
+        status: "APPROVED",
+      });
+      toast.success("Application approved.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to approve the application."));
+      return;
+    }
 
     setApplications((prev) =>
       prev.map((app) =>
@@ -163,8 +259,18 @@ export default function ApplicationsReview({ scope }: { scope: AcademicScope }) 
     setActiveModalApp(null);
   };
 
-  const handleReject = () => {
-    if (!activeModalApp) return;
+  const handleReject = async () => {
+    if (!activeModalApp || !activeModalApp.id) return;
+
+    try {
+      await api.patch(`/applications/${activeModalApp.id}/status`, {
+        status: "REJECTED",
+      });
+      toast.success("Application rejected.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to reject the application."));
+      return;
+    }
 
     setApplications((prev) =>
       prev.map((app) =>
@@ -393,29 +499,29 @@ export default function ApplicationsReview({ scope }: { scope: AcademicScope }) 
             <div className="space-y-2">
               <h4 className="text-[11px] font-bold text-zinc-500 uppercase tracking-wider">Submitted Attachments</h4>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                {activeModalApp.documentsUploaded.map((doc, idx) => (
+                {activeModalApp.documentsUploaded.map((docUrl, idx) => (
                   <div key={idx} className="p-2.5 rounded-xl border border-amber-900/10 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 flex items-center justify-between text-xs">
                     <div className="flex items-center gap-2 truncate">
                       <FileText className="w-4 h-4 text-emerald-600 shrink-0" />
-                      <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate">{doc}</span>
+                      <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate">
+                        {docUrl.split("/").pop() || "document"}
+                      </span>
                     </div>
-                    <button
-                      onClick={() =>
-                        downloadTextFile(
-                          `${doc.replace(/[^a-zA-Z0-9]+/g, "-").toLowerCase()}.txt`,
-                          [
-                            `Document: ${doc}`,
-                            `Applicant: ${activeModalApp.applicantName}`,
-                            `Application: ${activeModalApp.id}`,
-                          ].join("\n"),
-                        )
-                      }
+                    <a
+                      href={docUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
                       className="text-emerald-700 dark:text-emerald-400 hover:underline text-[11px] font-bold shrink-0 cursor-pointer"
                     >
-                      Download
-                    </button>
+                      View
+                    </a>
                   </div>
                 ))}
+                {activeModalApp.documentsUploaded.length === 0 && (
+                  <p className="text-[11px] text-zinc-400 italic col-span-full">
+                    No documents uploaded with this application.
+                  </p>
+                )}
               </div>
             </div>
 
@@ -460,7 +566,7 @@ export default function ApplicationsReview({ scope }: { scope: AcademicScope }) 
               <div className="space-y-2 pt-1">
                 <p className="text-[11px] font-bold text-zinc-500">Available Sub-Classes & Seats:</p>
 
-                {SCHOOL_CLASSES.filter((c) => {
+                {availableClasses.filter((c) => {
                   if (supportsTrades) {
                     return c.category === "TVET" && c.tradeName === selectedTrade;
                   }
@@ -509,7 +615,7 @@ export default function ApplicationsReview({ scope }: { scope: AcademicScope }) 
                 })}
 
                 {/* Empty State when no classes exist */}
-                {SCHOOL_CLASSES.filter((c) =>
+                {availableClasses.filter((c) =>
                   supportsTrades
                     ? c.category === "TVET" && c.tradeName === selectedTrade
                     : c.category === activeModalApp.appliedCategory && c.levelName === activeModalApp.appliedLevel

@@ -434,20 +434,20 @@ export const STAFF_DATA: StaffMember[] = [
     email: "e.mugisha@cfsg.ac.rw",
     bio: "Specialist in software engineering and database management with hands-on technical workshop training experience.",
     imageUrl: "/images/staff/eric-mugisha.jpg",
-    levelsOrClasses: "Level 3, 4 & 5 SOD",
-    courseOrSubject: "Software Development",
+    levelsOrClasses: "Level 3, 4 & 5 Accounting",
+    courseOrSubject: "Accounting",
     teachingAssignments: [
       {
-        levelOrClass: "Level 3 SOD",
-        subjects: ["Algorithms & Programming Basics", "Computer Hardware"],
+        levelOrClass: "Level 3 Accounting",
+        subjects: ["Financial Accounting Basics", "Business Math"],
       },
       {
-        levelOrClass: "Level 4 SOD",
-        subjects: ["Database Systems", "Object-Oriented Programming"],
+        levelOrClass: "Level 4 Accounting",
+        subjects: ["Cost Accounting", "Taxation"],
       },
       {
-        levelOrClass: "Level 5 SOD",
-        subjects: ["Web Development", "Software Testing"],
+        levelOrClass: "Level 5 Accounting",
+        subjects: ["Auditing", "Corporate Finance"],
       },
     ],
   },

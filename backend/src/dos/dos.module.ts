@@ -6,6 +6,6 @@ import { DbModule } from 'src/db/db.module';
 @Module({
   imports: [SupabaseModule, DbModule],
   controllers: [DosController],
-  providers: [DosService]
+  providers: [DosService],
 })
 export class DosModule {}

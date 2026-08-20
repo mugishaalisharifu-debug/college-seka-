@@ -24,25 +24,52 @@ export class DosController {
   //===========================================================================
 
   @Post('classes')
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Admin',
+  )
   async registerClass(@Body() registerClassDto: any, @Req() req: any) {
     return await this.dosService.registerClass(registerClassDto, req.user);
   }
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster', 'Secondary-HeadMaster', 'Bursar', "School-receptionist",
-  "Store-Manager", 'Cashier')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Bursar',
+    'School-receptionist',
+    'Store-Manager',
+    'Cashier',
+    'Admin',
+  )
   @Get('classes')
   async getClassesByScope(@Req() req: any) {
     return await this.dosService.getClassesByScope(req.user);
   }
 
   @Delete('classes/:id')
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Admin',
+  )
   async deleteClass(@Param('id') classId: string, @Req() req: any) {
     return await this.dosService.deleteClass(classId, req.user);
   }
 
   @Patch('classes/:id')
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Admin',
+  )
   async updateClass(
     @Param('id') classId: string,
     @Body() updateDto: any,
@@ -51,25 +78,45 @@ export class DosController {
     return await this.dosService.updateClass(classId, updateDto, req.user);
   }
 
-
   //===========================================================================
   // 3. STUDENT RECORDS
   //===========================================================================
 
   @Post('students')
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Admin',
+  )
   async registerStudentDirectly(@Body() registerDto: any, @Req() req: any) {
     return await this.dosService.registerStudentDirectly(registerDto, req.user);
   }
 
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster', 'Secondary-HeadMaster', 'Bursar', 'Store-Manager', 'School-receptionist')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Bursar',
+    'Store-Manager',
+    'School-receptionist',
+    'Admin',
+  )
   @Get('students')
   async getStudents(@Req() req: any) {
     return await this.dosService.getStudents(req.user);
   }
 
   @Patch('students/:id')
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Admin',
+  )
   async updateStudent(
     @Param('id') studentId: string,
     @Body() updateDto: any,
@@ -79,7 +126,13 @@ export class DosController {
   }
 
   @Delete('students/:id')
-  @Roles('DOS-Tvet', 'DOS-Secondary', 'Primary-HeadMaster')
+  @Roles(
+    'DOS-Tvet',
+    'DOS-Secondary',
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'Admin',
+  )
   async deleteStudent(@Param('id') studentId: string, @Req() req: any) {
     return await this.dosService.deleteStudents(studentId, req.user);
   }

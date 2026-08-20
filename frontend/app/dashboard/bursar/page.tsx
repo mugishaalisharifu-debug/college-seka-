@@ -130,8 +130,12 @@ export default function BursarDashboardPage() {
 
   // Filters & selection
   const [levelFilter, setLevelFilter] = useState<EducationLevelFilter>("All");
+  const [classFilter, setClassFilter] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedStudentId, setSelectedStudentId] = useState<string>("");
+
+  // Full class list so the bursar can browse students by any class in the school.
+  const [classList, setClassList] = useState<DbClass[]>([]);
 
   const selectedStudent = students.find((s) => s.id === selectedStudentId) || students[0];
 
@@ -148,6 +152,7 @@ export default function BursarDashboardPage() {
         ]);
 
         const classMap = new Map(classesRes.data.map((c) => [c.id, c.className]));
+        setClassList(classesRes.data || []);
         const debtorMap = new Map(debtorsRes.data.map((d) => [d.studentId, d]));
         const feeMap = new Map<string, FeeItem[]>();
         feesRes.data.forEach((fee) => {
@@ -243,13 +248,34 @@ export default function BursarDashboardPage() {
   const filteredStudents = useMemo(() => {
     return students.filter((stu) => {
       const matchLevel = levelFilter === "All" || stu.educationLevel === levelFilter;
+      const matchClass = classFilter === "All" || stu.className === classFilter;
       const matchSearch =
         stu.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         stu.regNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
         stu.className.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchLevel && matchSearch;
+      return matchLevel && matchClass && matchSearch;
     });
-  }, [levelFilter, searchQuery, students]);
+  }, [levelFilter, classFilter, searchQuery, students]);
+
+  // Classes available for the class filter (scoped by the selected level).
+  const classFilterOptions = useMemo(() => {
+    const seen = new Set<string>();
+    const opts: string[] = [];
+    classList.forEach((c) => {
+      if (levelFilter !== "All" && c.scope !== levelFilter) return;
+      if (seen.has(c.className)) return;
+      seen.add(c.className);
+      opts.push(c.className);
+    });
+    return opts.sort();
+  }, [classList, levelFilter]);
+
+  // Keep the selected class valid when the level changes.
+  useEffect(() => {
+    if (classFilter !== "All" && !classFilterOptions.includes(classFilter)) {
+      setClassFilter("All");
+    }
+  }, [classFilter, classFilterOptions]);
 
   // Debtors list calculation
   const debtorsList = useMemo(() => {
@@ -406,6 +432,17 @@ export default function BursarDashboardPage() {
               <option value="PRIMARY">Primary</option>
               <option value="LOWER SECONDARY">Lower Secondary</option>
               <option value="TVET">TVET</option>
+            </select>
+
+            <select
+              value={classFilter}
+              onChange={(e) => setClassFilter(e.target.value)}
+              className="w-full px-3 py-2 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-bold text-zinc-900 dark:text-white"
+            >
+              <option value="All">All Classes</option>
+              {classFilterOptions.map((cls) => (
+                <option key={cls} value={cls}>{cls}</option>
+              ))}
             </select>
 
             <div className="relative">

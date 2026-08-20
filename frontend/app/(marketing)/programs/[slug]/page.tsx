@@ -20,7 +20,7 @@ const PROGRAM_DETAILS: Record<string, { title: string; description: string; high
   tvet: {
     title: "TVET Programs",
     description: "Hands-on vocational and technical training that equips students with employable practical skills.",
-    highlights: ["Agriculture", "Mechanics", "Software development", "Food processing"],
+    highlights: ["Agriculture", "Mechanics", "Accounting", "Food processing"],
   },
 };
 

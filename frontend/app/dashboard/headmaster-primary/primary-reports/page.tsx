@@ -16,13 +16,18 @@ import {
   Eye,
   CalendarRange,
   Layers,
+  Plus,
 } from "lucide-react";
 import ReportViewerModal, { ReportData } from "@/components/dashboard/ReportViewerModal";
 import { downloadTextFile } from "@/lib/file-export";
+import {
+  ACADEMIC_TERMS,
+  addNextAcademicYear,
+  loadAcademicYears,
+} from "@/lib/academic-years";
 
-// Available academic years and terms (the school continues to use the system year after year)
-const ACADEMIC_YEARS = ["2025-2026", "2026-2027", "2027-2028", "2028-2029"];
-const TERMS = ["Term 1", "Term 2", "Term 3"];
+// Available academic terms (the school continues to use the system year after year)
+const TERMS = ACADEMIC_TERMS;
 
 interface PrimaryReport {
   id: string;
@@ -43,6 +48,17 @@ export default function PrimaryReportsPage() {
   const [term, setTerm] = useState<string>("Term 1");
   const [activeReport, setActiveReport] = useState<ReportData | null>(null);
   const [reports, setReports] = useState<PrimaryReport[]>([]);
+
+  // Academic-year options that can grow year after year.
+  const [academicYears, setAcademicYears] = useState<string[]>(() => loadAcademicYears());
+
+  const handleAddAcademicYear = () => {
+    const nextList = addNextAcademicYear(academicYears, academicYear);
+    setAcademicYears(nextList);
+    // Auto-select the newly added year so reports immediately target it.
+    const next = nextList[nextList.length - 1];
+    setAcademicYear(next);
+  };
 
   const handleExportReport = (report: PrimaryReport, reportData: ReportData) => {
     downloadTextFile(
@@ -112,12 +128,19 @@ export default function PrimaryReportsPage() {
                   className="bg-transparent text-xs font-bold text-zinc-900 dark:text-white focus:outline-none cursor-pointer"
                   title="Academic Year"
                 >
-                  {ACADEMIC_YEARS.map((yr) => (
+                  {academicYears.map((yr) => (
                     <option key={yr} value={yr}>
                       {yr}
                     </option>
                   ))}
                 </select>
+                <button
+                  onClick={handleAddAcademicYear}
+                  title={`Add next academic year (${academicYears[academicYears.length - 1]}) for the next school year`}
+                  className="p-1 rounded-md bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 transition-all cursor-pointer"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                </button>
               </div>
               <div className="flex items-center gap-2 px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
                 <Layers className="w-4 h-4 text-emerald-700 dark:text-emerald-400" />

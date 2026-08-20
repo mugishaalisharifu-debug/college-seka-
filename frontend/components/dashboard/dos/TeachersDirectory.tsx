@@ -1,6 +1,8 @@
 "use client";
 
-import React, { useState, ChangeEvent } from "react";
+import React, { useState, useEffect, ChangeEvent } from "react";
+import { STAFF_DATA } from "@/exports";
+import { CardSkeleton } from "@/components/ui/Skeleton";
 import {
   Plus,
   Search,
@@ -53,10 +55,9 @@ const DEPARTMENTS: DepartmentType[] = [
   "Support",
 ];
 
-
-
 // Fallback image path when none is uploaded or provided
 const DEFAULT_AVATAR_PATH = "/images/staff/default-avatar.jpg";
+const LOCAL_STORAGE_KEY = "cfsg_staff_directory";
 
 // ==========================================
 // MAIN CONTROLLER COMPONENT
@@ -65,9 +66,38 @@ export default function TeachersDirectory() {
   const [viewMode, setViewMode] = useState<"list" | "add" | "edit">("list");
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [selectedStaff, setSelectedStaff] = useState<StaffMember | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
 
   const [activeTab, setActiveTab] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  useEffect(() => {
+    setIsLoading(true);
+    try {
+      const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          setStaffList(parsed as StaffMember[]);
+          setIsLoading(false);
+          return;
+        }
+      }
+    } catch (e) {
+      console.error("Failed to load staff list from localStorage", e);
+    }
+    // Fallback to default staff dataset
+    setStaffList(STAFF_DATA as StaffMember[]);
+    setIsLoading(false);
+  }, []);
+
+  const saveToLocalStorage = (newList: StaffMember[]) => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(newList));
+    } catch (e) {
+      console.error("Failed to save staff list to localStorage", e);
+    }
+  };
 
   const filteredStaff = staffList.filter((member) => {
     const matchesTab = activeTab === "All" || member.department === activeTab;
@@ -89,17 +119,25 @@ export default function TeachersDirectory() {
 
   const handleDeleteStaff = (id: string, name: string) => {
     if (confirm(`Are you sure you want to delete ${name}?`)) {
-      setStaffList((prev) => prev.filter((item) => item.id !== id));
+      setStaffList((prev) => {
+        const updated = prev.filter((item) => item.id !== id);
+        saveToLocalStorage(updated);
+        return updated;
+      });
     }
   };
 
   const handleSaveStaff = (savedMember: StaffMember) => {
     setStaffList((prev) => {
       const exists = prev.some((item) => item.id === savedMember.id);
+      let updated: StaffMember[];
       if (exists) {
-        return prev.map((item) => (item.id === savedMember.id ? savedMember : item));
+        updated = prev.map((item) => (item.id === savedMember.id ? savedMember : item));
+      } else {
+        updated = [savedMember, ...prev];
       }
-      return [savedMember, ...prev];
+      saveToLocalStorage(updated);
+      return updated;
     });
     setViewMode("list");
   };
@@ -160,62 +198,66 @@ export default function TeachersDirectory() {
             </div>
 
             {/* Teacher Cards Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {filteredStaff.length === 0 && (
-                <div className="col-span-full py-16 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900 space-y-3">
-                  <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400">
-                    No staff records found. Data will load from the server.
-                  </p>
-                </div>
-              )}
-              {filteredStaff.map((staff) => (
-                <div
-                  key={staff.id}
-                  className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xs flex flex-col"
-                >
-                  <div className="relative w-full h-56 bg-zinc-200 dark:bg-zinc-800">
-                    <img
-                      src={staff.imageUrl || DEFAULT_AVATAR_PATH}
-                      alt={staff.name}
-                      className="w-full h-full object-cover object-top"
-                    />
+            {isLoading ? (
+              <CardSkeleton count={6} />
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                {filteredStaff.length === 0 && (
+                  <div className="col-span-full py-16 text-center border border-dashed border-zinc-200 dark:border-zinc-800 rounded-2xl bg-white dark:bg-zinc-900 space-y-3">
+                    <p className="text-xs font-bold text-zinc-600 dark:text-zinc-400">
+                      No staff records found matching your query or department filter.
+                    </p>
                   </div>
+                )}
+                {filteredStaff.map((staff) => (
+                  <div
+                    key={staff.id}
+                    className="bg-white dark:bg-zinc-900 rounded-2xl border border-zinc-200 dark:border-zinc-800 overflow-hidden shadow-xs flex flex-col"
+                  >
+                    <div className="relative w-full h-56 bg-zinc-200 dark:bg-zinc-800">
+                      <img
+                        src={staff.imageUrl || DEFAULT_AVATAR_PATH}
+                        alt={staff.name}
+                        className="w-full h-full object-cover object-top"
+                      />
+                    </div>
 
-                  <div className="p-5 flex flex-col flex-grow">
-                    <span className="px-2.5 py-0.5 w-fit rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 mb-2">
-                      {staff.department}
-                    </span>
+                    <div className="p-5 flex flex-col flex-grow">
+                      <span className="px-2.5 py-0.5 w-fit rounded-full text-[10px] font-bold bg-emerald-100 dark:bg-emerald-950 text-emerald-800 dark:text-emerald-300 mb-2">
+                        {staff.department}
+                      </span>
 
-                    <h3 className="font-bold text-base text-zinc-900 dark:text-white">
-                      {staff.name}
-                    </h3>
-                    <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-2">
-                      {staff.role}
-                    </p>
+                      <h3 className="font-bold text-base text-zinc-900 dark:text-white">
+                        {staff.name}
+                      </h3>
+                      <p className="text-xs font-semibold text-emerald-700 dark:text-emerald-400 mb-2">
+                        {staff.role}
+                      </p>
 
-                    <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-3 mb-4">
-                      {staff.bio}
-                    </p>
+                      <p className="text-xs text-zinc-600 dark:text-zinc-300 line-clamp-3 mb-4">
+                        {staff.bio}
+                      </p>
 
-                    <div className="mt-auto pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2">
-                      <button
-                        onClick={() => handleOpenEditPage(staff)}
-                        className="flex-1 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-700 text-zinc-700 dark:text-zinc-200 font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                      >
-                        <Pencil className="w-3.5 h-3.5" /> Edit
-                      </button>
-                      <button
-                        onClick={() => handleDeleteStaff(staff.id, staff.name)}
-                        className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 hover:bg-rose-100 transition-all cursor-pointer"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                      <div className="mt-auto pt-3 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-between gap-2">
+                        <button
+                          onClick={() => handleOpenEditPage(staff)}
+                          className="flex-1 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-emerald-50 dark:hover:bg-emerald-950 hover:text-emerald-700 text-zinc-700 dark:text-zinc-200 font-bold flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Pencil className="w-3.5 h-3.5" /> Edit
+                        </button>
+                        <button
+                          onClick={() => handleDeleteStaff(staff.id, staff.name)}
+                          className="p-2 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 hover:bg-rose-100 transition-all cursor-pointer"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -266,11 +308,9 @@ function StaffFormPage({ mode, initialData, onBack, onSave }: StaffFormPageProps
   const handleImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPhotoPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      // Create a temporary object URL instead of base64 to save local storage space
+      const objectUrl = URL.createObjectURL(file);
+      setPhotoPreview(objectUrl);
     }
   };
 
@@ -427,7 +467,7 @@ function StaffFormPage({ mode, initialData, onBack, onSave }: StaffFormPageProps
             </label>
             <input
               type="text"
-              placeholder="e.g. Software Development"
+              placeholder="e.g. Accounting"
               value={courseOrSubject}
               onChange={(e) => setCourseOrSubject(e.target.value)}
               className="w-full px-3.5 py-2.5 rounded-xl border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 text-xs font-medium text-zinc-900 dark:text-white"

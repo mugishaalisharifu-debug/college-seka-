@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   Plus,
@@ -8,7 +8,11 @@ import {
   Users,
   ArrowLeft,
   X,
+  Trash2,
 } from "lucide-react";
+import toast from "react-hot-toast";
+import api from "@/lib/api";
+import { getApiErrorMessage } from "@/lib/api-helpers";
 
 interface PrimaryClass {
   id: string;
@@ -16,6 +20,23 @@ interface PrimaryClass {
   section: "Nursery" | "Primary";
   capacity: number;
   enrolled: number;
+}
+
+interface BackendClass {
+  id: string;
+  className: string;
+  scope: string;
+  tradeName?: string | null;
+}
+
+function mapClasses(rows: BackendClass[]): PrimaryClass[] {
+  return (rows || []).map((c) => ({
+    id: c.id,
+    className: c.className,
+    section: (c.scope === "NURSERY" ? "Nursery" : "Primary") as "Nursery" | "Primary",
+    capacity: 40,
+    enrolled: 0,
+  }));
 }
 
 export default function ManagePrimaryClassesPage() {
@@ -30,22 +51,49 @@ export default function ManagePrimaryClassesPage() {
   const [classSectionInput, setClassSectionInput] = useState<"Nursery" | "Primary">("Primary");
   const [capacityInput, setCapacityInput] = useState<number>(40);
 
-  const handleCreateClass = (e: React.FormEvent) => {
+  const reloadClasses = async () => {
+    try {
+      const res = await api.get<BackendClass[]>("/dos/classes");
+      setClassList(mapClasses(res.data));
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Could not load classes."));
+    }
+  };
+
+  useEffect(() => {
+    reloadClasses();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const handleCreateClass = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!classNameInput.trim()) return;
 
-    const newClass: PrimaryClass = {
-      id: `CLS-0${classList.length + 1}`,
-      className: classNameInput.trim(),
-      section: classSectionInput,
-      capacity: capacityInput,
-      enrolled: 0,
-    };
+    try {
+      await api.post("/dos/classes", {
+        className: classNameInput.trim(),
+        scope: classSectionInput === "Nursery" ? "NURSERY" : "PRIMARY",
+        tradeName: null,
+      });
+      toast.success("Class created successfully.");
+      setIsModalOpen(false);
+      setClassNameInput("");
+      setCapacityInput(40);
+      await reloadClasses();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to create the class."));
+    }
+  };
 
-    setClassList([...classList, newClass]);
-    setIsModalOpen(false);
-    setClassNameInput("");
-    setCapacityInput(40);
+  const handleDeleteClass = async (id: string, name: string) => {
+    if (!confirm(`Delete class "${name}"? This cannot be undone.`)) return;
+    try {
+      await api.delete(`/dos/classes/${id}`);
+      toast.success("Class deleted.");
+      await reloadClasses();
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "Failed to delete the class."));
+    }
   };
 
   const filteredClasses = classList.filter((cls) => cls.section === activeTab);
@@ -119,7 +167,17 @@ export default function ManagePrimaryClassesPage() {
                   <span className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wide bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
                     {cls.section}
                   </span>
-                  <span className="text-xs font-mono text-zinc-400">{cls.id}</span>
+                  <span className="flex items-center gap-2">
+                    <span className="text-xs font-mono text-zinc-400">{cls.id}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleDeleteClass(cls.id, cls.className)}
+                      title="Delete class"
+                      className="p-1.5 rounded-lg bg-rose-50 dark:bg-rose-950/50 text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/40 transition-colors cursor-pointer"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </span>
                 </div>
 
                 <div>

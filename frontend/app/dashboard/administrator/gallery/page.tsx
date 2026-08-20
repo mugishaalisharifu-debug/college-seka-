@@ -91,6 +91,9 @@ export default function AdministratorGalleryPage() {
 
   useEffect(() => {
     loadItems();
+    if (typeof window !== "undefined" && window.location.search.includes("action=add")) {
+      setShowModal(true);
+    }
   }, []);
 
   // ------------------------------------------------------------

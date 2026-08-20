@@ -30,15 +30,20 @@ export class InventoryController {
 
   @Post('items')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
   async createItem(
-    @Body() dto: { name: string; category: string; unit: 'kg' | 'liters' | 'bags' }
+    @Body()
+    dto: {
+      name: string;
+      category: string;
+      unit: 'kg' | 'liters' | 'bags';
+    },
   ) {
     return await this.inventoryService.createItem(dto);
   }
 
   @Patch('items/:id')
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
   async updateItem(
     @Param('id') id: string,
     @Body()
@@ -49,14 +54,14 @@ export class InventoryController {
 
   @Delete('items/:id')
   @HttpCode(HttpStatus.OK)
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
   async deleteItem(@Param('id') id: string) {
     return await this.inventoryService.deleteItem(id);
   }
 
   @Post('stock-in')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
   async stockIn(
     @Body()
     dto: {
@@ -67,14 +72,14 @@ export class InventoryController {
       dateReceived: string;
       notes?: string;
     },
-    @Req() req: any
+    @Req() req: any,
   ) {
     return await this.inventoryService.recordStockIn(dto, req.user.id);
   }
 
   @Post('stock-out')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
   async stockOut(
     @Body()
     dto: {
@@ -86,19 +91,21 @@ export class InventoryController {
       timeIssued?: string;
       notes?: string;
     },
-    @Req() req: any
+    @Req() req: any,
   ) {
     return await this.inventoryService.recordStockOut(dto, req.user.id);
   }
 
   @Get('history')
-  @Roles('Cashier')
-  async getHistory(@Query('type') type?: 'STOCK_IN' | 'STOCK_OUT' | 'SPOILAGE') {
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
+  async getHistory(
+    @Query('type') type?: 'STOCK_IN' | 'STOCK_OUT' | 'SPOILAGE',
+  ) {
     return await this.inventoryService.getTransactionHistory(type);
   }
   @Post('spoilage')
   @HttpCode(HttpStatus.CREATED)
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
   async recordSpoilage(
     @Body()
     dto: {
@@ -114,23 +121,20 @@ export class InventoryController {
       timeReported?: string;
       notes?: string;
     },
-    @Req() req: any
+    @Req() req: any,
   ) {
     return await this.inventoryService.recordSpoilage(dto, req.user.id);
   }
 
   @Patch('transactions/:id')
-  @Roles('Cashier')
-  async updateTransaction(
-    @Param('id') id: string,
-    @Body() dto: any,
-  ) {
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
+  async updateTransaction(@Param('id') id: string, @Body() dto: any) {
     return await this.inventoryService.updateTransaction(id, dto);
   }
 
   @Delete('transactions/:id')
   @HttpCode(HttpStatus.OK)
-  @Roles('Cashier')
+  @Roles('Cashier', 'Secondary-HeadMaster', 'Admin')
   async deleteTransaction(@Param('id') id: string) {
     return await this.inventoryService.deleteTransaction(id);
   }

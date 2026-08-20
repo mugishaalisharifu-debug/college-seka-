@@ -7,10 +7,11 @@ import {
 import * as schema from '../db/schema';
 import { DRIZZLE } from '../db/db.provider';
 import { NodePgDatabase } from 'drizzle-orm/node-postgres';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, or } from 'drizzle-orm';
 import { CloudinaryService } from 'src/cloudinary/cloudinary.service';
 import { SupabaseService } from 'src/supabase/supabase.service';
 import { EmailService } from 'src/email/email.service';
+import { clearStarterData } from '../db/clear-starter.js';
 
 @Injectable()
 export class AdminService {
@@ -38,11 +39,19 @@ export class AdminService {
       .orderBy(desc(schema.news.createdAt));
   }
 
-  async getNewsBySlug(slug: string) {
+  async getNewsBySlug(slugOrId: string) {
+    const isUuid =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+        slugOrId,
+      );
     const [article] = await this.db
       .select()
       .from(schema.news)
-      .where(eq(schema.news.slug, slug));
+      .where(
+        isUuid
+          ? or(eq(schema.news.slug, slugOrId), eq(schema.news.id, slugOrId))
+          : eq(schema.news.slug, slugOrId),
+      );
 
     if (!article) {
       throw new NotFoundException('News article not found.');
@@ -348,7 +357,8 @@ export class AdminService {
     dto: {
       title?: string;
       description?: string;
-      category?: 'General' | 'Admissions' | 'Academic' | 'Fees' | 'Requirements';
+      category?:
+        'General' | 'Admissions' | 'Academic' | 'Fees' | 'Requirements';
       fileFormat?: string;
       downloadUrl?: string;
     },
@@ -401,9 +411,7 @@ export class AdminService {
       );
     }
 
-    await this.db
-      .delete(schema.downloads)
-      .where(eq(schema.downloads.id, id));
+    await this.db.delete(schema.downloads).where(eq(schema.downloads.id, id));
 
     return { message: 'Document resource deleted successfully.' };
   }
@@ -411,7 +419,7 @@ export class AdminService {
   // ======================
   // - CONTACT & MESSAGES SERVICES
   // ======================
-async getAllContactMessages() {
+  async getAllContactMessages() {
     return await this.db
       .select()
       .from(schema.contactMessages)
@@ -473,7 +481,7 @@ async getAllContactMessages() {
     return newMessage;
   }
 
- async replyToContactMessage(
+  async replyToContactMessage(
     id: string,
     dto: { replySubject?: string; replyMessage: string },
   ) {
@@ -555,5 +563,9 @@ async getAllContactMessages() {
       .where(eq(schema.contactMessages.id, id));
 
     return { message: 'Contact message deleted successfully.' };
+  }
+
+  async resetStarterData() {
+    return await clearStarterData();
   }
 }

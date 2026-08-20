@@ -46,7 +46,13 @@ export class ApplicationsController {
 
   @Get()
   @UseGuards(JwtGuard, RoleGuard)
-  @Roles('Primary-HeadMaster', 'Secondary-HeadMaster', 'DOS-Secondary', 'DOS-Tvet')
+  @Roles(
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'DOS-Secondary',
+    'DOS-Tvet',
+    'Admin',
+  )
   async getAllApplications(
     @Req() req: any,
     @Query('status') status?: string,
@@ -57,14 +63,26 @@ export class ApplicationsController {
 
   @Get(':id')
   @UseGuards(JwtGuard, RoleGuard)
-  @Roles('Primary-HeadMaster', 'Secondary-HeadMaster', 'DOS-Secondary', 'DOS-Tvet')
+  @Roles(
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'DOS-Secondary',
+    'DOS-Tvet',
+    'Admin',
+  )
   async getApplicationDetails(@Req() req: any, @Param('id') id: string) {
     return await this.applicationsService.findOne(id, req.user);
   }
 
   @Patch(':id/status')
   @UseGuards(JwtGuard, RoleGuard)
-  @Roles('Primary-HeadMaster', 'Secondary-HeadMaster', 'DOS-Secondary', 'DOS-Tvet')
+  @Roles(
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'DOS-Secondary',
+    'DOS-Tvet',
+    'Admin',
+  )
   async updateStatus(
     @Req() req: any,
     @Param('id') id: string,
@@ -75,7 +93,13 @@ export class ApplicationsController {
 
   @Delete(':id')
   @UseGuards(JwtGuard, RoleGuard)
-  @Roles('Primary-HeadMaster', 'Secondary-HeadMaster', 'DOS-Secondary', 'DOS-Tvet')
+  @Roles(
+    'Primary-HeadMaster',
+    'Secondary-HeadMaster',
+    'DOS-Secondary',
+    'DOS-Tvet',
+    'Admin',
+  )
   async deleteApplication(@Req() req: any, @Param('id') id: string) {
     return await this.applicationsService.deleteApplication(id, req.user);
   }

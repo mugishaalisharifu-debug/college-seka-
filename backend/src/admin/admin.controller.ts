@@ -200,7 +200,8 @@ export class AdminController {
     dto: {
       title?: string;
       description?: string;
-      category?: 'General' | 'Admissions' | 'Academic' | 'Fees' | 'Requirements';
+      category?:
+        'General' | 'Admissions' | 'Academic' | 'Fees' | 'Requirements';
       fileFormat?: string;
       downloadUrl?: string;
     },
@@ -272,5 +273,13 @@ export class AdminController {
   @Delete('contact-messages/:id')
   async deleteContactMessage(@Param('id') id: string) {
     return await this.adminService.deleteContactMessage(id);
+  }
+
+  @UseGuards(JwtGuard, RoleGuard)
+  @Roles('Admin')
+  @Post('reset-starter-data')
+  @HttpCode(HttpStatus.OK)
+  async resetStarterData() {
+    return await this.adminService.resetStarterData();
   }
 }

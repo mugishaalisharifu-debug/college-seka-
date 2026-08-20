@@ -19,9 +19,7 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "types": ["node"],
-
-    /* ─── FIXED: Removed baseUrl, updated paths format ─── */
+    "types": ["node", "express", "multer"],
     "paths": {
       "src/*": ["./src/*"],
       "common/*": ["./common/*"]
@@ -29,6 +27,7 @@
   },
   "include": [
     "src/**/*",
-    "common/**/*"
+    "common/**/*",
+    "test/**/*"
   ]
 }

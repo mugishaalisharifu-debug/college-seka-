@@ -1,0 +1,8 @@
+﻿.git
+.idea
+backend
+frontend
+README.md
+SETUP.md
+TODO.md
+ver-check.txt
