@@ -1,0 +1,149 @@
+"use client";
+
+import React, { useState } from "react";
+import {
+  School,
+  Users,
+  CheckCircle2,
+  AlertCircle,
+  Eye,
+} from "lucide-react";
+import ReportViewerModal, { ReportData } from "@/components/dashboard/ReportViewerModal";
+
+export default function HeadmasterPrimaryDashboard() {
+  const [activeReport, setActiveReport] = useState<ReportData | null>(null);
+
+  const handleOpenReport = (title: string, category: string) => {
+    setActiveReport({
+      id: `RPT-PRI-${Date.now().toString().slice(-4)}`,
+      title: title,
+      academicYear: "2026/2027",
+      generatedDate: "August 11, 2026",
+      generatedBy: "Primary Headmaster Office",
+      summary: `Detailed institutional summary report for ${category}. Comprehensive overview of primary school metrics, student document verification, and store requirement fulfillment.`,
+      headers: ["Class / Stream", "Enrolled Students", "Requirements Cleared", "Pending Docs"],
+      rows: [
+        ["Nursery 1 (N1)", "32", "30 (93.7%)", "2"],
+        ["Nursery 2 (N2)", "35", "35 (100%)", "0"],
+        ["Primary 1 (P1)", "45", "42 (93.3%)", "3"],
+        ["Primary 2 (P2)", "44", "44 (100%)", "0"],
+        ["Primary 3 (P3)", "48", "45 (93.7%)", "3"],
+        ["Primary 4 (P4)", "50", "48 (96.0%)", "2"],
+        ["Primary 5 (P5)", "45", "44 (97.7%)", "1"],
+        ["Primary 6 (P6)", "42", "42 (100%)", "0"],
+      ],
+    });
+  };
+
+  return (
+    <div className="space-y-6 pb-12">
+      {/* Header Banner */}
+      <div className="rounded-3xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 md:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div>
+          <span className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-sky-50 dark:bg-sky-950/60 border border-sky-200 dark:border-sky-800 text-sky-800 dark:text-sky-300 text-xs font-bold uppercase tracking-wide">
+            <School className="w-3.5 h-3.5" /> Primary Headmaster Office
+          </span>
+          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white mt-3">
+            Primary & Nursery School Operations
+          </h1>
+          <p className="text-xs md:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-2xl mt-1">
+            Executive oversight of Nursery (N1-N3) and Primary (P1-P6) departments — student census, supply requirements, and academic performance reports.
+          </p>
+        </div>
+
+        <div className="flex items-center gap-3 shrink-0">
+          <button
+            onClick={() => handleOpenReport("Primary School Performance & Requirements Summary", "Primary Department")}
+            className="px-4 py-2.5 rounded-2xl bg-sky-700 hover:bg-sky-800 text-white text-xs font-bold flex items-center gap-2 shadow-xs transition-all cursor-pointer"
+          >
+            <Eye className="w-4 h-4" /> View Primary Report
+          </button>
+        </div>
+      </div>
+
+      {/* KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-zinc-900 border border-amber-900/10 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-sky-700 dark:text-sky-400">
+            <Users className="w-5 h-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Primary Enrolled</span>
+          </div>
+          <p className="text-3xl font-extrabold text-zinc-900 dark:text-white mt-3">341</p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">P1 through P6 Students</p>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-amber-900/10 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-sky-700 dark:text-sky-400">
+            <School className="w-5 h-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Nursery Enrolled</span>
+          </div>
+          <p className="text-3xl font-extrabold text-zinc-900 dark:text-white mt-3">67</p>
+          <p className="text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold mt-1">N1 to N3 Early Childhood</p>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-amber-900/10 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-emerald-700 dark:text-emerald-400">
+            <CheckCircle2 className="w-5 h-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Requirements Collected</span>
+          </div>
+          <p className="text-3xl font-extrabold text-zinc-900 dark:text-white mt-3">96.3%</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Toilet paper, soap & stationery</p>
+        </div>
+
+        <div className="bg-white dark:bg-zinc-900 border border-amber-900/10 dark:border-zinc-800 rounded-3xl p-5 shadow-xs">
+          <div className="flex items-center justify-between text-amber-700 dark:text-amber-400">
+            <AlertCircle className="w-5 h-5" />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400">Pending Docs</span>
+          </div>
+          <p className="text-3xl font-extrabold text-zinc-900 dark:text-white mt-3">11</p>
+          <p className="text-[11px] text-amber-600 font-semibold mt-1">Birth certs / Transfer letters</p>
+        </div>
+      </div>
+
+      {/* Class Level Breakdown */}
+      <div className="rounded-3xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-xs space-y-4">
+        <div className="flex items-center justify-between border-b border-amber-900/10 dark:border-zinc-800 pb-4">
+          <div>
+            <h3 className="text-base font-bold text-zinc-900 dark:text-white">Primary Class Roster & Capacity</h3>
+            <p className="text-xs text-zinc-500 mt-0.5">Overview of streams and student verification status</p>
+          </div>
+          <button
+            onClick={() => handleOpenReport("Primary Roster & Requirements Audit", "Roster Audit")}
+            className="text-xs font-bold text-sky-700 dark:text-sky-400 hover:underline cursor-pointer"
+          >
+            Open Full Audit Report →
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[
+            { name: "Nursery (N1-N3)", enrolled: 67, max: 75, status: "Normal" },
+            { name: "Primary 1 (P1)", enrolled: 45, max: 45, status: "Full" },
+            { name: "Primary 2 (P2)", enrolled: 44, max: 45, status: "1 Seat" },
+            { name: "Primary 3 (P3)", enrolled: 48, max: 50, status: "2 Seats" },
+            { name: "Primary 4 (P4)", enrolled: 50, max: 50, status: "Full" },
+            { name: "Primary 5 (P5)", enrolled: 45, max: 45, status: "Full" },
+            { name: "Primary 6 (P6)", enrolled: 42, max: 45, status: "3 Seats" },
+          ].map((item) => (
+            <div key={item.name} className="p-4 rounded-2xl border border-amber-900/10 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-800/40 flex justify-between items-center text-xs">
+              <div>
+                <p className="font-bold text-zinc-900 dark:text-white">{item.name}</p>
+                <p className="text-zinc-500 text-[11px] mt-0.5">{item.enrolled} / {item.max} Students</p>
+              </div>
+              <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase ${
+                item.status === "Full" ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300" : "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300"
+              }`}>
+                {item.status}
+              </span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Interactive Report Modal */}
+      {activeReport && (
+        <ReportViewerModal report={activeReport} onClose={() => setActiveReport(null)} />
+      )}
+    </div>
+  );
+}

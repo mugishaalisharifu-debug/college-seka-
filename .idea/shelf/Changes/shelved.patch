@@ -1,0 +1,137 @@
+Index: frontend/app/dashboard/headmaster-secondary/students/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/students/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/headmaster-secondary/students/page.tsx b/frontend/app/dashboard/headmaster-secondary/students/page.tsx
+--- a/frontend/app/dashboard/headmaster-secondary/students/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/headmaster-secondary/students/page.tsx	(date 1786616719249)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/students/page";
++import DosStudentsListPage from "@/components/dashboard/dos/StudentsList";
++export default DosStudentsListPage;
+Index: frontend/app/dashboard/headmaster-secondary/applications/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/applications/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/headmaster-secondary/applications/page.tsx b/frontend/app/dashboard/headmaster-secondary/applications/page.tsx
+--- a/frontend/app/dashboard/headmaster-secondary/applications/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/headmaster-secondary/applications/page.tsx	(date 1786616832447)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/applications/page";
++import DosApplicationsPage from '@/components/dashboard/dos/Applications';
++export default DosApplicationsPage;
+Index: frontend/app/dashboard/dos-secondary/students/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/students/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/dos-secondary/students/page.tsx b/frontend/app/dashboard/dos-secondary/students/page.tsx
+--- a/frontend/app/dashboard/dos-secondary/students/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/dos-secondary/students/page.tsx	(date 1786616692627)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/students/page";
++import DosStudentsListPage from "@/components/dashboard/dos/StudentsList";
++export default DosStudentsListPage;
+Index: frontend/app/dashboard/dos-tvet/students/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/students/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/dos-tvet/students/page.tsx b/frontend/app/dashboard/dos-tvet/students/page.tsx
+--- a/frontend/app/dashboard/dos-tvet/students/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/dos-tvet/students/page.tsx	(date 1786616701343)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/students/page";
++import DosStudentsListPage from "@/components/dashboard/dos/StudentsList";
++export default DosStudentsListPage;
+Index: frontend/app/dashboard/dos-secondary/applications/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/applications/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/dos-secondary/applications/page.tsx b/frontend/app/dashboard/dos-secondary/applications/page.tsx
+--- a/frontend/app/dashboard/dos-secondary/applications/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/dos-secondary/applications/page.tsx	(date 1786616751189)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/applications/page";
++import DosApplicationsPage from '@/components/dashboard/dos/Applications';
++export default DosApplicationsPage;
+Index: frontend/app/dashboard/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>\"use client\";\r\n\r\nimport React from \"react\";\r\nimport Link from \"next/link\";\r\nimport {\r\n  ShieldCheck,\r\n  GraduationCap,\r\n  ClipboardCheck,\r\n  UserCheck,\r\n  Receipt,\r\n  CreditCard,\r\n  Package,\r\n  Warehouse,\r\n  ArrowUpRight,\r\n  Users,\r\n  BookOpen,\r\n  TrendingUp,\r\n  CalendarCheck,\r\n  AlertTriangle,\r\n  Wallet,\r\n  School,\r\n} from \"lucide-react\";\r\n\r\n// Role gateway config — each role ONLY accesses its own module\r\nconst ROLE_GATEWAYS = [\r\n  {\r\n    key: \"administrator\",\r\n    label: \"System Administrator\",\r\n    description: \"Full platform control — users, content, gallery, downloads, reports & announcements.\",\r\n    href: \"/dashboard/administrator\",\r\n    icon: ShieldCheck,\r\n    accent: \"emerald\",\r\n    modules: 5,\r\n    kpi: \"24 Published News\",\r\n  },\r\n  {\r\n    key: \"headmaster-primary\",\r\n    label: \"Primary Headmaster\",\r\n    description: \"Manage primary student admissions, classes, requirements, and reports.\",\r\n    href: \"/dashboard/headmaster-primary\",\r\n    icon: School,\r\n    accent: \"sky\",\r\n    modules: 4,\r\n    kpi: \"240 Primary\",\r\n  },\r\n  {\r\n    key: \"headmaster-secondary\",\r\n    label: \"Secondary Headmaster\",\r\n    description: \"Manage lower secondary student admissions, class assignments, and school reports.\",\r\n    href: \"/dashboard/headmaster-secondary\",\r\n    icon: School,\r\n    accent: \"sky\",\r\n    modules: 4,\r\n    kpi: \"180 Secondary\",\r\n  },\r\n  {\r\n    key: \"dos-secondary\",\r\n    label: \"DOS Lower Secondary\",\r\n    description: \"Upload and manage lower secondary student lists, classes, and reports.\",\r\n    href: \"/dashboard/dos-secondary\",\r\n    icon: GraduationCap,\r\n    accent: \"blue\",\r\n    modules: 5,\r\n    kpi: \"S1-S3 Students\",\r\n  },\r\n  {\r\n    key: \"dos-tvet\",\r\n    label: \"DOS TVET\",\r\n    description: \"Upload TVET student lists, manage trade classes, and review extra requirements.\",\r\n    href: \"/dashboard/dos-tvet\",\r\n    icon: GraduationCap,\r\n    accent: \"blue\",\r\n    modules: 5,\r\n    kpi: \"TVET Students\",\r\n  },\r\n  {\r\n    key: \"store-manager\",\r\n    label: \"Store Manager\",\r\n    description: \"Store oversight — collect items, manage usage, track stock and produce inventory reports.\",\r\n    href: \"/dashboard/store-manager\",\r\n    icon: Warehouse,\r\n    accent: \"violet\",\r\n    modules: 4,\r\n    kpi: \"15 Stock Items\",\r\n  },\r\n  {\r\n    key: \"bursar\",\r\n    label: \"School Bursar\",\r\n    description: \"Finance — fee structure, student ledgers, payments, receipts and cash flow.\",\r\n    href: \"/dashboard/bursar\",\r\n    icon: Receipt,\r\n    accent: \"amber\",\r\n    modules: 4,\r\n    kpi: \"87.2M RWF\",\r\n  },\r\n  {\r\n    key: \"cashier\",\r\n    label: \"Cashier\",\r\n    description: \"Store & kitchen — stock in, stock out, spoilage and daily reports.\",\r\n    href: \"/dashboard/cashier\",\r\n    icon: CreditCard,\r\n    accent: \"violet\",\r\n    modules: 5,\r\n    kpi: \"6 Stock Items\",\r\n  },\r\n  {\r\n    key: \"requirement-collector\",\r\n    label: \"Requirement Collector\",\r\n    description: \"Enrollment support — student checklist verification and school supplies distribution.\",\r\n    href: \"/dashboard/requirement-collector\",\r\n    icon: Package,\r\n    accent: \"teal\",\r\n    modules: 3,\r\n    kpi: \"12 Pending Checks\",\r\n  },\r\n] as const;\r\n\r\nconst ACCENT_STYLES: Record<string, { badge: string; iconBg: string; arrow: string; hover: string }> = {\r\n  emerald: {\r\n    badge: \"bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300\",\r\n    iconBg: \"bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-400\",\r\n    arrow: \"group-hover:text-emerald-700 dark:group-hover:text-emerald-400\",\r\n    hover: \"hover:border-emerald-600/60 dark:hover:border-emerald-500/60\",\r\n  },\r\n  sky: {\r\n    badge: \"bg-sky-100 text-sky-800 dark:bg-sky-950/50 dark:text-sky-300\",\r\n    iconBg: \"bg-sky-50 text-sky-700 dark:bg-sky-950/50 dark:text-sky-400\",\r\n    arrow: \"group-hover:text-sky-700 dark:group-hover:text-sky-400\",\r\n    hover: \"hover:border-sky-600/60 dark:hover:border-sky-500/60\",\r\n  },\r\n  blue: {\r\n    badge: \"bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300\",\r\n    iconBg: \"bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-400\",\r\n    arrow: \"group-hover:text-blue-700 dark:group-hover:text-blue-400\",\r\n    hover: \"hover:border-blue-600/60 dark:hover:border-blue-500/60\",\r\n  },\r\n  rose: {\r\n    badge: \"bg-rose-100 text-rose-800 dark:bg-rose-950/50 dark:text-rose-300\",\r\n    iconBg: \"bg-rose-50 text-rose-700 dark:bg-rose-950/50 dark:text-rose-400\",\r\n    arrow: \"group-hover:text-rose-700 dark:group-hover:text-rose-400\",\r\n    hover: \"hover:border-rose-600/60 dark:hover:border-rose-500/60\",\r\n  },\r\n  amber: {\r\n    badge: \"bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300\",\r\n    iconBg: \"bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-400\",\r\n    arrow: \"group-hover:text-amber-700 dark:group-hover:text-amber-400\",\r\n    hover: \"hover:border-amber-600/60 dark:hover:border-amber-500/60\",\r\n  },\r\n  violet: {\r\n    badge: \"bg-violet-100 text-violet-800 dark:bg-violet-950/50 dark:text-violet-300\",\r\n    iconBg: \"bg-violet-50 text-violet-700 dark:bg-violet-950/50 dark:text-violet-400\",\r\n    arrow: \"group-hover:text-violet-700 dark:group-hover:text-violet-400\",\r\n    hover: \"hover:border-violet-600/60 dark:hover:border-violet-500/60\",\r\n  },\r\n  teal: {\r\n    badge: \"bg-teal-100 text-teal-800 dark:bg-teal-950/50 dark:text-teal-300\",\r\n    iconBg: \"bg-teal-50 text-teal-700 dark:bg-teal-950/50 dark:text-teal-400\",\r\n    arrow: \"group-hover:text-teal-700 dark:group-hover:text-teal-400\",\r\n    hover: \"hover:border-teal-600/60 dark:hover:border-teal-500/60\",\r\n  },\r\n};\r\n\r\nconst SCHOOL_WIDE_KPIS = [\r\n  { label: \"Total Students\", value: \"1,250+\", icon: Users, color: \"text-emerald-700 dark:text-emerald-400\", bg: \"bg-emerald-50 dark:bg-emerald-950/50\" },\r\n  { label: \"Teaching Staff\", value: \"68\", icon: BookOpen, color: \"text-sky-700 dark:text-sky-400\", bg: \"bg-sky-50 dark:bg-sky-950/50\" },\r\n  { label: \"Term Collection\", value: \"87.2M RWF\", icon: TrendingUp, color: \"text-amber-700 dark:text-amber-400\", bg: \"bg-amber-50 dark:bg-amber-950/50\" },\r\n  { label: \"Today Attendance\", value: \"94.7%\", icon: CalendarCheck, color: \"text-violet-700 dark:text-violet-400\", bg: \"bg-violet-50 dark:bg-violet-950/50\" },\r\n  { label: \"Active Suspensions\", value: \"8\", icon: AlertTriangle, color: \"text-rose-700 dark:text-rose-400\", bg: \"bg-rose-50 dark:bg-rose-950/50\" },\r\n  { label: \"Budget Target\", value: \"103.9M RWF\", icon: Wallet, color: \"text-teal-700 dark:text-teal-400\", bg: \"bg-teal-50 dark:bg-teal-950/50\" },\r\n];\r\n\r\nexport default function CentralCommandDashboard() {\r\n  return (\r\n    <div className=\"space-y-8 pb-12\">\r\n      {/* Header Banner */}\r\n      <div className=\"rounded-3xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 md:p-8 shadow-xs\">\r\n        <div className=\"flex flex-col md:flex-row md:items-center justify-between gap-6\">\r\n          <div className=\"space-y-1.5\">\r\n            <span className=\"inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-bold uppercase tracking-wide\">\r\n              <ShieldCheck className=\"w-3.5 h-3.5\" />\r\n              Staff Portal — Central Command\r\n            </span>\r\n            <h1 className=\"text-2xl md:text-3xl font-bold tracking-tight text-zinc-900 dark:text-white\">\r\n              School Management Overview\r\n            </h1>\r\n            <p className=\"text-xs md:text-sm text-zinc-600 dark:text-zinc-400 leading-relaxed max-w-2xl\">\r\n              Select your department below to access your dedicated module. Each role is\r\n              scoped to its own responsibilities only — from academic administration to\r\n              finance, discipline, and school stores.\r\n            </p>\r\n          </div>\r\n\r\n          <div className=\"flex items-center gap-2 bg-emerald-100/70 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800 px-4 py-2.5 rounded-2xl shrink-0\">\r\n            <School className=\"w-5 h-5 text-emerald-700 dark:text-emerald-400\" />\r\n            <div className=\"text-left text-xs\">\r\n              <p className=\"font-bold text-emerald-900 dark:text-emerald-300\">Academic Year 2026/2027</p>\r\n              <p className=\"text-[10px] text-emerald-700 dark:text-emerald-400\">Term 1 — In Session</p>\r\n            </div>\r\n          </div>\r\n        </div>\r\n      </div>\r\n\r\n      {/* School-wide KPI Strip */}\r\n      <div className=\"grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4\">\r\n        {SCHOOL_WIDE_KPIS.map((kpi) => {\r\n          const Icon = kpi.icon;\r\n          return (\r\n            <div key={kpi.label} className=\"p-4 rounded-2xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-xs\">\r\n              <div className={`w-fit p-2 rounded-xl ${kpi.bg}`}>\r\n                <Icon className={`w-4 h-4 ${kpi.color}`} />\r\n              </div>\r\n              <p className=\"mt-3 text-xl font-bold font-mono text-zinc-900 dark:text-white\">{kpi.value}</p>\r\n              <p className=\"text-[10px] font-bold uppercase tracking-wider text-zinc-500 dark:text-zinc-400 mt-0.5\">\r\n                {kpi.label}\r\n              </p>\r\n            </div>\r\n          );\r\n        })}\r\n      </div>\r\n\r\n      {/* Role Gateway Cards */}\r\n      <div>\r\n        <div className=\"flex items-center gap-2 mb-4\">\r\n          <Users className=\"w-4 h-4 text-emerald-700 dark:text-emerald-400\" />\r\n          <h2 className=\"text-sm font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200\">\r\n            Staff Role Gateways\r\n          </h2>\r\n          <span className=\"text-[11px] text-zinc-400 font-medium\">7 departments — access controlled by role</span>\r\n        </div>\r\n\r\n        <div className=\"grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5\">\r\n          {ROLE_GATEWAYS.map((role) => {\r\n            const Icon = role.icon;\r\n            const accent = ACCENT_STYLES[role.accent];\r\n\r\n            return (\r\n              <Link\r\n                key={role.key}\r\n                href={role.href}\r\n                className={`group relative rounded-3xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-5 shadow-xs transition-all ${accent.hover} hover:shadow-md flex flex-col justify-between min-h-[180px]`}\r\n              >\r\n                <div className=\"flex items-start justify-between\">\r\n                  <div className={`p-3 rounded-2xl ${accent.iconBg}`}>\r\n                    <Icon className=\"w-6 h-6\" />\r\n                  </div>\r\n                  <ArrowUpRight className={`w-4 h-4 text-zinc-300 dark:text-zinc-600 transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 ${accent.arrow}`} />\r\n                </div>\r\n\r\n                <div className=\"mt-4 space-y-1\">\r\n                  <h3 className=\"font-sans font-bold text-base text-zinc-900 dark:text-white\">\r\n                    {role.label}\r\n                  </h3>\r\n                  <p className=\"text-[11px] text-zinc-500 dark:text-zinc-400 leading-relaxed line-clamp-2\">\r\n                    {role.description}\r\n                  </p>\r\n                </div>\r\n\r\n                <div className=\"mt-4 pt-3 border-t border-amber-900/10 dark:border-zinc-800 flex items-center justify-between\">\r\n                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${accent.badge}`}>\r\n                    {role.modules} Modules\r\n                  </span>\r\n                  <span className=\"text-[11px] font-semibold text-zinc-500 dark:text-zinc-400\">\r\n                    {role.kpi}\r\n                  </span>\r\n                </div>\r\n              </Link>\r\n            );\r\n          })}\r\n        </div>\r\n      </div>\r\n\r\n      {/* Quick Access Strip */}\r\n      <div className=\"rounded-3xl border border-emerald-900/20 dark:border-emerald-800/40 bg-emerald-900 text-white p-6 md:p-8 shadow-md\">\r\n        <div className=\"flex flex-col md:flex-row md:items-center justify-between gap-4\">\r\n          <div className=\"space-y-1\">\r\n            <h3 className=\"font-sans font-bold text-lg\">Consolidated Institutional Reporting</h3>\r\n            <p className=\"text-xs text-emerald-100/80 leading-relaxed max-w-xl\">\r\n              The Headmaster module provides a single-pane oversight of the entire school —\r\n              student census, fee collection, store balances, and exportable reports.\r\n            </p>\r\n          </div>\r\n          <Link\r\n            href=\"/dashboard/headmaster/reports\"\r\n            className=\"inline-flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-white text-emerald-950 font-bold text-xs hover:bg-emerald-50 transition-all w-fit shrink-0\"\r\n          >\r\n            <span>Open Consolidated Reports</span>\r\n            <ArrowUpRight className=\"w-4 h-4\" />\r\n          </Link>\r\n        </div>\r\n      </div>\r\n    </div>\r\n  );\r\n}\r\n\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/page.tsx b/frontend/app/dashboard/page.tsx
+--- a/frontend/app/dashboard/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/page.tsx	(date 1786616982108)
+@@ -44,10 +44,10 @@
+     kpi: "240 Primary",
+   },
+   {
+-    key: "headmaster-secondary",
+-    label: "Secondary Headmaster",
+-    description: "Manage lower secondary student admissions, class assignments, and school reports.",
+-    href: "/dashboard/headmaster-secondary",
++    key: "headmaster-secondary-tvet",
++    label: "Secondary & TVET Headmaster",
++    description: "Manage lower secondary and TVET admissions, class assignments, and school reports.",
++    href: "/dashboard/headmaster-secondary-tvet",
+     icon: School,
+     accent: "sky",
+     modules: 4,
+Index: frontend/app/dashboard/dos-tvet/applications/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/applications/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/dos-tvet/applications/page.tsx b/frontend/app/dashboard/dos-tvet/applications/page.tsx
+--- a/frontend/app/dashboard/dos-tvet/applications/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/dos-tvet/applications/page.tsx	(date 1786616775186)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/applications/page";
++import DosApplicationsPage from '@/components/dashboard/dos/Applications';
++export default DosApplicationsPage;
+Index: frontend/app/dashboard/headmaster-secondary-tvet/students/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/students/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/headmaster-secondary-tvet/students/page.tsx b/frontend/app/dashboard/headmaster-secondary-tvet/students/page.tsx
+--- a/frontend/app/dashboard/headmaster-secondary-tvet/students/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/headmaster-secondary-tvet/students/page.tsx	(date 1786616711398)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/students/page";
++import DosStudentsListPage from "@/components/dashboard/dos/StudentsList";
++export default DosStudentsListPage;
+Index: frontend/app/dashboard/headmaster-secondary-tvet/applications/page.tsx
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>export { default } from \"../../dos/applications/page\";\r\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+diff --git a/frontend/app/dashboard/headmaster-secondary-tvet/applications/page.tsx b/frontend/app/dashboard/headmaster-secondary-tvet/applications/page.tsx
+--- a/frontend/app/dashboard/headmaster-secondary-tvet/applications/page.tsx	(revision 4de6bbe653a01a5c0cd7002aa523c547c2450460)
++++ b/frontend/app/dashboard/headmaster-secondary-tvet/applications/page.tsx	(date 1786616802096)
+@@ -1,1 +1,2 @@
+-export { default } from "../../dos/applications/page";
++import DosApplicationsPage from '@/components/dashboard/dos/Applications';
++export default DosApplicationsPage;
