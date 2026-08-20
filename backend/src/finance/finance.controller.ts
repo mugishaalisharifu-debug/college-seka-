@@ -102,7 +102,7 @@ export class FinanceController {
   }
 
   @Get('debtors')
-  @Roles('Bursar')
+  @Roles('Bursar', 'Secondary-HeadMaster')
   async getAllDebtors(
     @Query('academicYear') academicYear?: string,
     @Query('term') term?: 'TERM_1' | 'TERM_2' | 'TERM_3',

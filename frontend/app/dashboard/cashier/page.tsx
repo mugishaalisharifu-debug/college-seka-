@@ -92,9 +92,6 @@ export default function CashierOverviewPage() {
       {!isLoading && !error && (
       <>
 
-      {!isLoading && !error && (
-      <>
-
       {/* Header Banner */}
       <div className="rounded-3xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 md:p-8 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1.5">

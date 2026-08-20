@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, type ElementType } from "react";
+import React, { useState, useEffect, type ElementType } from "react";
 import {
   Newspaper,
   Image as ImageIcon,
@@ -12,14 +12,191 @@ import {
   ArrowUpRight,
   Clock,
   Eye,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
+import api from "@/lib/api";
+import { getApiErrorMessage, formatDate } from "@/lib/api-helpers";
+
+interface NewsItem {
+  id: string;
+  title: string;
+  category: string;
+  status: string;
+  createdAt: string;
+}
+
+interface GalleryItem {
+  id: string;
+  published: boolean;
+}
+
+interface ContactMessage {
+  id: string;
+  sender: string;
+  subject: string;
+  status: string;
+  createdAt: string;
+}
+
+interface DownloadItem {
+  id: string;
+  title: string;
+  category: string;
+  fileSize: string;
+  createdAt: string;
+}
+
+interface StatCard {
+  title: string;
+  count: string;
+  change: string;
+  icon: ElementType;
+  color: string;
+  bgColor: string;
+  href: string;
+}
+
+interface RecentMessage {
+  id: string;
+  sender: string;
+  subject: string;
+  time: string;
+  status: string;
+}
+
+interface RecentNews {
+  id: string;
+  title: string;
+  category: string;
+  date: string;
+  status: string;
+}
 
 export default function AdminOverviewPage() {
   // Summary KPI Cards Data
-  const [stats, setStats] = useState<{ title: string; count: string; change: string; icon: ElementType; color: string; bgColor: string; href: string }[]>([]);
-  const [recentMessages, setRecentMessages] = useState<{ id: string; sender: string; subject: string; time: string; status: string }[]>([]);
-  const [recentNews, setRecentNews] = useState<{ id: string; title: string; category: string; date: string; views: string }[]>([]);
+  const [stats, setStats] = useState<StatCard[]>([]);
+  const [recentMessages, setRecentMessages] = useState<RecentMessage[]>([]);
+  const [recentNews, setRecentNews] = useState<RecentNews[]>([]);
+  const [recentDownloads, setRecentDownloads] = useState<DownloadItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadData = async () => {
+      setIsLoading(true);
+      try {
+        const [newsRes, galleryRes, messagesRes, downloadsRes] = await Promise.all([
+          api.get<NewsItem[]>("/admin/news"),
+          api.get<GalleryItem[]>("/admin/gallery"),
+          api.get<ContactMessage[]>("/admin/contact-messages"),
+          api.get<DownloadItem[]>("/admin/downloads"),
+        ]);
+
+        const news = newsRes.data ?? [];
+        const galleryItems = galleryRes.data ?? [];
+        const messages = messagesRes.data ?? [];
+        const downloads = downloadsRes.data ?? [];
+
+        const publishedNews = news.filter((n) => n.status === "Published").length;
+        const publishedMedia = galleryItems.filter((g) => g.published).length;
+        const unreadMessages = messages.filter((m) => m.status === "New").length;
+        const downloadCategories = new Set(downloads.map((d) => d.category)).size;
+
+        setStats([
+          {
+            title: "News & Announcements",
+            count: String(news.length),
+            change: `${publishedNews} published`,
+            icon: Newspaper,
+            color: "text-emerald-700",
+            bgColor: "bg-emerald-50 dark:bg-emerald-950",
+            href: "/dashboard/administrator/news",
+          },
+          {
+            title: "Gallery Media",
+            count: String(galleryItems.length),
+            change: `${publishedMedia} visible on portal`,
+            icon: ImageIcon,
+            color: "text-amber-700",
+            bgColor: "bg-amber-50 dark:bg-amber-950",
+            href: "/dashboard/administrator/gallery",
+          },
+          {
+            title: "Portal Messages",
+            count: String(messages.length),
+            change: `${unreadMessages} awaiting review`,
+            icon: MessageSquare,
+            color: "text-sky-700",
+            bgColor: "bg-sky-50 dark:bg-sky-950",
+            href: "/dashboard/administrator/contact-messages",
+          },
+          {
+            title: "Downloadable Documents",
+            count: String(downloads.length),
+            change: `${downloadCategories} categories`,
+            icon: FileDown,
+            color: "text-violet-700",
+            bgColor: "bg-violet-50 dark:bg-violet-950",
+            href: "/dashboard/administrator/downloads",
+          },
+        ]);
+
+        setRecentNews(
+          [...news]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 4)
+            .map((n) => ({
+              id: n.id,
+              title: n.title,
+              category: n.category,
+              date: formatDate(n.createdAt),
+              status: n.status,
+            })),
+        );
+
+        setRecentDownloads(
+          [...downloads]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 4),
+        );
+
+        setRecentMessages(
+          [...messages]
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+            .slice(0, 4)
+            .map((m) => ({
+              id: m.id,
+              sender: m.sender,
+              subject: m.subject,
+              time: formatDate(m.createdAt),
+              status: m.status,
+            })),
+        );
+      } catch (err) {
+        setError(getApiErrorMessage(err));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    loadData();
+  }, []);
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 animate-spin text-emerald-700" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="p-6 rounded-2xl bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 text-rose-800 dark:text-rose-300">
+        Failed to load dashboard data: {error}
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8 pb-10">
@@ -114,9 +291,9 @@ export default function AdminOverviewPage() {
             </div>
 
             <div className="space-y-3">
-              {recentNews.map((news, idx) => (
+              {recentNews.map((news) => (
                 <div
-                  key={idx}
+                  key={news.id}
                   className="p-4 rounded-2xl bg-amber-900/5 dark:bg-zinc-800/50 border border-amber-900/10 dark:border-zinc-800 flex items-center justify-between gap-4"
                 >
                   <div className="space-y-1">
@@ -133,7 +310,7 @@ export default function AdminOverviewPage() {
 
                   <div className="flex items-center gap-1 text-[11px] font-mono text-zinc-500 shrink-0">
                     <Eye className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>{news.views} views</span>
+                    <span>{news.status}</span>
                   </div>
                 </div>
               ))}
@@ -161,29 +338,29 @@ export default function AdminOverviewPage() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="p-3.5 rounded-2xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-800/40 flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700">
-                  <FileDown className="w-4 h-4" />
+              {recentDownloads.map((doc) => (
+                <div
+                  key={doc.id}
+                  className="p-3.5 rounded-2xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-800/40 flex items-center gap-3"
+                >
+                  <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-950 text-emerald-700">
+                    <FileDown className="w-4 h-4" />
+                  </div>
+                  <div className="overflow-hidden">
+                    <h4 className="font-bold text-xs text-zinc-900 dark:text-white truncate">
+                      {doc.title}
+                    </h4>
+                    <p className="text-[10px] text-zinc-400">
+                      {doc.category} • {doc.fileSize}
+                    </p>
+                  </div>
                 </div>
-                <div className="overflow-hidden">
-                  <h4 className="font-bold text-xs text-zinc-900 dark:text-white truncate">
-                    School Prospectus 2026.pdf
-                  </h4>
-                  <p className="text-[10px] text-zinc-400">Public Portal • 2.4 MB</p>
+              ))}
+              {recentDownloads.length === 0 && (
+                <div className="col-span-full p-6 text-center text-zinc-400 text-xs">
+                  No downloadable documents uploaded yet.
                 </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl border border-amber-900/10 dark:border-zinc-800 bg-white dark:bg-zinc-800/40 flex items-center gap-3">
-                <div className="p-2.5 rounded-xl bg-amber-50 dark:bg-amber-950 text-amber-700">
-                  <FileDown className="w-4 h-4" />
-                </div>
-                <div className="overflow-hidden">
-                  <h4 className="font-bold text-xs text-zinc-900 dark:text-white truncate">
-                    TVET SOD Curriculum Guide.pdf
-                  </h4>
-                  <p className="text-[10px] text-zinc-400">Academic • 4.1 MB</p>
-                </div>
-              </div>
+              )}
             </div>
           </div>
         </div>
@@ -217,7 +394,7 @@ export default function AdminOverviewPage() {
                     </span>
                     <span
                       className={`text-[9px] font-bold px-2 py-0.5 rounded-full ${
-                        msg.status === "Unread"
+                        msg.status === "New"
                           ? "bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300"
                           : msg.status === "Pending"
                           ? "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300"
